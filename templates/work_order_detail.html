@@ -195,24 +195,16 @@
         <h3>Quick Actions</h3>
       </div>
       <div class="card-body" style="display:flex; flex-direction:column; gap:10px">
-        <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary w-100">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+        <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
             <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/>
-          </svg>
-          {% if wo.status == 'open' %}Start Production{% else %}Log Rolls{% endif %}
+          </svg> {% if wo.status == 'open' %}Start Production{% else %}Log Rolls{% endif %}
         </a>
-        <a href="{{ url_for('packing_list_index') }}" class="btn btn-outline w-100">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+        <a href="{{ url_for('packing_list_index') }}" class="btn btn-outline w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          </svg>
-          Packing Lists
-        </a>
-        <a href="{{ url_for('dm_index') }}" class="btn btn-outline w-100">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          </svg> Packing Lists</a>
+        <a href="{{ url_for('dm_index') }}" class="btn btn-outline w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
             <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/>
-          </svg>
-          Dispatch Memos
-        </a>
+          </svg> Dispatch Memos</a>
         <div class="divider mt-0 mb-0"></div>
         <form method="POST" action="{{ url_for('work_order_delete', wo_id=wo.id) }}"
               onsubmit="return confirm('Delete this work order and ALL its data? This cannot be undone.')">

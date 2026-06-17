@@ -81,18 +81,14 @@
   </div>
 
   <div class="flex gap-2">
-    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M5 12l5 5L20 7"/></svg>
-      Create Packing List
-    </button>
+    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M5 12l5 5L20 7"/></svg> Create Packing List</button>
     <a href="{{ url_for('packing_list_index') }}" class="btn btn-ghost btn-lg">Cancel</a>
   </div>
 </form>
 
 {% else %}
 <div class="card">
-  <div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+  <div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/>
     </svg>
     <h3>No Ready Work Orders</h3>

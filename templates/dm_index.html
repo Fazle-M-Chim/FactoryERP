@@ -5,10 +5,7 @@
 
 {% block topbar_actions %}
   <a href="{{ url_for('dm_new') }}" class="btn btn-primary btn-sm"
-     {% if not undispatched %}style="opacity:.5;pointer-events:none" title="No packing lists waiting for DM"{% endif %}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
-    New Dispatch Memo
-  </a>
+     {% if not undispatched %}style="opacity:.5;pointer-events:none" title="No packing lists waiting for DM"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg> New Dispatch Memo</a>
 {% endblock %}
 
 {% block content %}
@@ -20,8 +17,7 @@
 </div>
 
 {% if undispatched %}
-<div class="info-banner">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+<div class="info-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
     <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
   </svg>
   <span><strong>{{ undispatched|length }} packing list{{ 's' if undispatched|length != 1 else '' }} awaiting dispatch:</strong>
@@ -71,8 +67,7 @@
     </table>
   </div>
   {% else %}
-  <div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+  <div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/>
     </svg>
     <h3>No Dispatch Memos Yet</h3>

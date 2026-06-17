@@ -5,10 +5,7 @@
 
 {% block topbar_actions %}
   <a href="{{ url_for('packing_list_new') }}" class="btn btn-primary btn-sm"
-     {% if not ready_wos %}style="opacity:.5; pointer-events:none" title="No Ready work orders"{% endif %}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
-    New Packing List
-  </a>
+     {% if not ready_wos %}style="opacity:.5; pointer-events:none" title="No Ready work orders"{% endif %}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg> New Packing List</a>
 {% endblock %}
 
 {% block content %}
@@ -20,8 +17,7 @@
 </div>
 
 {% if ready_wos %}
-<div class="info-banner">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+<div class="info-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
     <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
   </svg>
   <span><strong>{{ ready_wos|length }} work order{{ 's' if ready_wos|length != 1 else '' }} ready to pack:</strong>
@@ -87,8 +83,7 @@
     </table>
   </div>
   {% else %}
-  <div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+  <div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
       <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
     </svg>
     <h3>No Packing Lists Yet</h3>

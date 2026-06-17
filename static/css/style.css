@@ -527,9 +527,28 @@ select { cursor: pointer; }
   transition: all var(--transition);
   white-space: nowrap;
   line-height: 1;
+  vertical-align: middle;   /* aligns inline buttons with surrounding text */
 }
 
-.btn svg { width: 16px; height: 16px; }
+/* SVG inside any button — always vertically centred, never shrinks */
+.btn svg,
+.btn svg path,
+.btn svg polyline,
+.btn svg line,
+.btn svg rect,
+.btn svg circle {
+  /* Ensures SVG children don't introduce extra baseline gap */
+}
+
+.btn > svg {
+  display: block;           /* removes inline baseline gap */
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.btn-sm > svg { width: 14px; height: 14px; }
+.btn-lg > svg { width: 18px; height: 18px; }
 
 .btn-primary {
   background: var(--blue-accent);
@@ -782,7 +801,9 @@ select { cursor: pointer; }
   color: var(--text-muted);
 }
 
-.empty-state svg {
+/* Only the decorative icon at top of empty state, not SVGs inside buttons */
+.empty-state > svg,
+.empty-state > div > svg {
   width: 48px; height: 48px;
   color: var(--grey-200);
   margin-bottom: 12px;
@@ -798,6 +819,21 @@ select { cursor: pointer; }
 .empty-state p {
   font-size: .85rem;
   margin-bottom: 20px;
+}
+
+/* Button inside empty state — override any inherited styles */
+.empty-state .btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+.empty-state .btn > svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  flex-shrink: 0 !important;
 }
 
 /* ── CHALLAN / PRINT PREVIEW ──────────────────────── */
@@ -2456,4 +2492,153 @@ select { cursor: pointer; }
 /* Responsive: stack panels on medium/small screens */
 @media (max-width: 1100px) {
   .prod-split-layout { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════════
+   INVENTORY PRINT DOCUMENT STYLES
+   ══════════════════════════════════════════════════ */
+
+.inv-print-wrap {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10pt;
+  color: #000;
+  background: white;
+}
+
+/* ── Company header ── */
+.inv-print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 3px solid #1e3a5f;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+}
+
+.inv-print-company-name {
+  font-size: 18pt;
+  font-weight: 900;
+  letter-spacing: .04em;
+  color: #1e3a5f;
+  line-height: 1.1;
+}
+
+.inv-print-company-sub {
+  font-size: 8.5pt;
+  color: #444;
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.inv-print-doc-title {
+  text-align: right;
+}
+
+.inv-print-doc-name {
+  font-size: 14pt;
+  font-weight: 800;
+  color: #1e3a5f;
+  line-height: 1.1;
+}
+
+.inv-print-doc-date {
+  font-size: 9pt;
+  color: #555;
+  margin-top: 4px;
+}
+
+/* ── Summary bar (ledger only) ── */
+.inv-print-summary {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border: 1.5px solid #ccd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.inv-print-summary-item {
+  flex: 1;
+  padding: 8px 14px;
+  border-right: 1px solid #ccd;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inv-print-summary-item:last-child { border-right: none; }
+
+.inv-print-summary-label {
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: #666;
+  font-weight: 600;
+}
+
+.inv-print-summary-val {
+  font-size: 12pt;
+  font-weight: 800;
+}
+
+/* ── Main table ── */
+.inv-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+  margin-bottom: 14px;
+}
+
+.inv-print-table th {
+  background: #1e3a5f;
+  color: white;
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 8.5pt;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-weight: 700;
+}
+
+.inv-print-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e0e4ea;
+  vertical-align: middle;
+}
+
+.ipt-row-alt td { background: #f7f9fc; }
+
+.ipt-col-no   { width: 28px; }
+.ipt-col-grade { width: 100px; }
+.ipt-col-desc  { }
+.ipt-col-num   { width: 100px; }
+
+.ipt-center { text-align: center; }
+.ipt-right  { text-align: right; }
+
+.ipt-ok       { color: #1a7a2e; }
+.ipt-low      { color: #d97706; }
+.ipt-negative { color: #c0392b; }
+.ipt-flag     { font-weight: 900; }
+
+/* ── Totals row ── */
+.ipt-total-row td {
+  background: #1e3a5f;
+  color: white;
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 9.5pt;
+  border-bottom: none;
+}
+
+.ipt-total-label { }
+
+/* ── Footer ── */
+.inv-print-footer {
+  font-size: 7.5pt;
+  color: #888;
+  border-top: 1px solid #ccc;
+  padding-top: 6px;
+  text-align: center;
+  margin-top: 10px;
 }

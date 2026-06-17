@@ -32,9 +32,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-        </svg>
-        Dashboard
-      </a>
+        </svg> Dashboard</a>
       {% if request.endpoint == 'dashboard' and g.dash_counts is defined %}
       <div class="nav-stage-filter">
         {% set f = g.dash_filter %}
@@ -77,9 +75,7 @@
          class="nav-link {% if request.endpoint == 'work_order_new' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 5v14M5 12h14"/>
-        </svg>
-        New Work Order
-      </a>
+        </svg> New Work Order</a>
       {% endif %}
 
       <!-- Production — always visible, with in-production WOs listed below -->
@@ -88,9 +84,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
           <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3"/>
-        </svg>
-        Production
-      </a>
+        </svg> Production</a>
       {% if g.in_production_wos is defined and g.in_production_wos %}
       <div class="nav-stage-filter">
         {% for prod_wo in g.in_production_wos %}
@@ -110,18 +104,14 @@
          class="nav-link {% if request.endpoint in ['packing_list_index','packing_list_new','packing_list_detail'] %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-        </svg>
-        Packing Lists
-      </a>
+        </svg> Packing Lists</a>
 
       <!-- Dispatch Memos -->
       <a href="{{ url_for('dm_index') }}"
          class="nav-link {% if request.endpoint in ['dm_index','dm_new','dm_detail','dm_edit'] %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-        </svg>
-        Dispatch Memos
-      </a>
+        </svg> Dispatch Memos</a>
       {% endif %}
 
       <!-- Inventory — admin + supervisor -->
@@ -130,9 +120,7 @@
          class="nav-link {% if request.endpoint in ['inventory_index','inventory_add_stock','inventory_ledger'] %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20 7l-8-4-8 4m16 0v10l-8 4m0-14L4 17m8-14v14"/>
-        </svg>
-        Inventory
-      </a>
+        </svg> Inventory</a>
       {% endif %}
 
       <!-- Current WO context (only when inside a WO page) -->
@@ -142,16 +130,12 @@
          class="nav-link {% if request.endpoint == 'work_order_detail' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
-        </svg>
-        Work Order
-      </a>
+        </svg> Work Order</a>
       <a href="{{ url_for('production', wo_id=wo.id) }}"
          class="nav-link {% if request.endpoint == 'production' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3"/>
-        </svg>
-        Production Log
-      </a>
+        </svg> Production Log</a>
       {% endif %}
 
       {% if current_user.is_authenticated and current_user.role == 'admin' %}
@@ -161,32 +145,24 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
           <path d="M9 12h6M9 16h4"/>
-        </svg>
-        Recipes
-      </a>
+        </svg> Recipes</a>
       <a href="{{ url_for('customers_manage') }}"
          class="nav-link {% if request.endpoint == 'customers_manage' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-        </svg>
-        Customers
-      </a>
+        </svg> Customers</a>
       <a href="{{ url_for('product_types_manage') }}"
          class="nav-link {% if request.endpoint == 'product_types_manage' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>
-        Product Types
-      </a>
+        </svg> Product Types</a>
       <a href="{{ url_for('users_manage') }}"
          class="nav-link {% if request.endpoint == 'users_manage' %}active{% endif %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
           <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-        </svg>
-        Users
-      </a>
+        </svg> Users</a>
       {% endif %}
     </nav>
 
@@ -226,8 +202,7 @@
       <div class="topbar-wo-badge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
-        </svg>
-        {{ wo.wo_number }} — {{ wo.customer_name }}
+        </svg> {{ wo.wo_number }} — {{ wo.customer_name }}
         <span class="badge {{ wo.status_css }}" style="margin-left:4px">{{ wo.status_label }}</span>
       </div>
       {% endif %}
@@ -238,14 +213,11 @@
           {{ current_user.username }}
           <span class="topbar-role">{{ current_user.role_label }}</span>
         </span>
-        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm topbar-signout">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm topbar-signout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
             <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          Sign Out
-        </a>
+          </svg> Sign Out</a>
       </div>
       {% endif %}
     </header>

@@ -138,10 +138,7 @@
   </div>
 
   <div class="flex gap-2">
-    <button type="submit" class="btn btn-primary btn-lg">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M5 12l5 5L20 7"/></svg>
-      {% if edit %}Update Recipe{% else %}Create Recipe{% endif %}
-    </button>
+    <button type="submit" class="btn btn-primary btn-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg> {% if edit %}Update Recipe{% else %}Create Recipe{% endif %}</button>
     <a href="{{ url_for('recipe_index') }}" class="btn btn-ghost btn-lg">Cancel</a>
   </div>
 </form>

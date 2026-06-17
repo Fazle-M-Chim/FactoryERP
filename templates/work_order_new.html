@@ -78,9 +78,7 @@
                    style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Edit Customers
-            </a>
+              </svg> Edit Customers</a>
           </label>
           {% if customers %}
             <select id="customer_id" name="customer_id" required>
@@ -112,9 +110,7 @@
                    style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Manage
-            </a>
+              </svg> Manage</a>
           </label>
           <select id="product_type" name="product_type" required>
             <option value="">— Select product —</option>
@@ -137,9 +133,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                    style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
                 <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
-              </svg>
-              Manage Recipes
-            </a>
+              </svg> Manage Recipes</a>
           </label>
           {% if recipes %}
           <select id="recipe_id" name="recipe_id" onchange="loadMaterialPreview()">
@@ -246,10 +240,7 @@
   </div>
 
   <div class="flex gap-2">
-    <button type="submit" class="btn btn-primary btn-lg">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
-      {% if edit %}Update Work Order{% else %}Create Work Order{% endif %}
-    </button>
+    <button type="submit" class="btn btn-primary btn-lg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg> {% if edit %}Update Work Order{% else %}Create Work Order{% endif %}</button>
     <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-lg">Cancel</a>
   </div>
 </form>
