@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }} — HIC Industries</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--grey-50, #f4f6f9); margin:0; }
+    .err-card { background:white; border-radius:12px; padding:44px 40px; width:420px; max-width:90vw;
+                box-shadow:0 12px 40px rgba(0,0,0,.12); text-align:center; }
+    .err-code { font-size:3.4rem; font-weight:800; color:var(--blue-primary, #1e3a5f); margin:0 0 6px; letter-spacing:.02em; }
+    .err-title { font-size:1.25rem; font-weight:700; color:#222; margin:0 0 10px; }
+    .err-msg { font-size:.92rem; color:var(--text-muted, #667); margin:0 0 24px; line-height:1.5; }
+    .err-actions a { display:inline-block; padding:10px 18px; border-radius:8px; text-decoration:none;
+                     font-weight:600; font-size:.9rem; }
+    .err-actions a.primary { background:var(--blue-accent, #2e86de); color:white; }
+    .err-actions a.ghost { color:var(--blue-accent, #2e86de); }
+  </style>
+</head>
+<body>
+  <div class="err-card">
+    <div class="err-code">{{ code }}</div>
+    <div class="err-title">{{ title }}</div>
+    <div class="err-msg">{{ message }}</div>
+    <div class="err-actions">
+      <a href="{{ url_for('dashboard') }}" class="primary">Go to Dashboard</a>
+      <a href="javascript:history.back()" class="ghost">Go Back</a>
+    </div>
+  </div>
+</body>
+</html>

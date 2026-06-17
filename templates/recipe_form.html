@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}{% if edit %}Edit{% else %}New{% endif %} Recipe{% endblock %}
+{% block topbar_title %}{% if edit %}Edit Recipe{% else %}New Recipe{% endif %}{% endblock %}
+{% block topbar_meta %}Formula sheet{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>{% if edit %}Edit: {{ recipe.name }}{% else %}New Recipe Sheet{% endif %}</h2>
+    <p>Define the layer composition, grade percentages, and material quantities.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('recipe_index') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('recipe_edit', recipe_id=recipe.id) if edit else url_for('recipe_new') }}" id="recipeForm">
+
+  <!-- Header info -->
+  <div class="card mb-3">
+    <div class="card-header"><h3>Recipe Header</h3></div>
+    <div class="card-body">
+      <div class="form-grid form-grid-3">
+        <div class="form-group">
+          <label>Recipe Name <span class="required">*</span></label>
+          <input type="text" name="name" value="{{ recipe.name if recipe else '' }}"
+                 placeholder="e.g. Lamination Chutney Grade" required>
+        </div>
+        <div class="form-group">
+          <label>Product Type</label>
+          <select name="product_type">
+            <option value="">— Select —</option>
+            {% for pt in product_types %}
+            <option value="{{ pt }}" {% if recipe and recipe.product_type == pt %}selected{% endif %}>{{ pt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Recipe No.</label>
+          <input type="text" name="recipe_no" value="{{ recipe.recipe_no if recipe else '' }}"
+                 placeholder="e.g. Nov 22">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" name="recipe_date"
+                 value="{{ recipe.date.strftime('%Y-%m-%d') if recipe and recipe.date else '' }}">
+        </div>
+        <div class="form-group">
+          <label>Layer Ratio</label>
+          <input type="text" name="layer_ratio" value="{{ recipe.layer_ratio if recipe else '1:1:1' }}"
+                 placeholder="e.g. 1:1:1">
+        </div>
+        <div class="form-group">
+          <label>Treatment (Dynes)</label>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;font-weight:500;cursor:pointer">
+              <input type="checkbox" name="treatment_na" value="1" id="treatmentNA"
+                     {% if recipe and recipe.treatment_na %}checked{% endif %}
+                     onchange="toggleTreatment(this)">
+              N/A — No treatment required
+            </label>
+          </div>
+          <div id="treatmentFields" style="display:{% if recipe and recipe.treatment_na %}none{% else %}flex{% endif %};gap:8px;align-items:center">
+            <input type="number" name="treatment_min" id="treatment_min" step="0.5"
+                   value="{{ recipe.treatment_min if recipe and recipe.treatment_min else '' }}"
+                   placeholder="Min" style="flex:1">
+            <span style="color:var(--text-muted)">to</span>
+            <input type="number" name="treatment_max" id="treatment_max" step="0.5"
+                   value="{{ recipe.treatment_max if recipe and recipe.treatment_max else '' }}"
+                   placeholder="Max" style="flex:1">
+          </div>
+          <span class="form-hint">Leave blank if not yet determined.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layers -->
+  {% for li in range(3) %}
+  {% set layer_name = layer_names[li] %}
+  {% set layer = recipe.layers[li] if recipe and recipe.layers|length > li else none %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <div>
+        <h3>{{ layer_name }} Layer</h3>
+        <p>Up to {{ max_grades }} grades — percentages should total 100%</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:.82rem;font-weight:600;color:var(--text-muted)">Target kg</label>
+        <input type="number" name="layer_{{ li }}_target_kg" step="0.1"
+               value="{{ layer.target_kg if layer else 100 }}"
+               style="width:80px;padding:6px 8px;font-size:.9rem;border:1.5px solid var(--grey-200);border-radius:var(--radius)">
+      </div>
+    </div>
+    <div class="card-body" style="padding-bottom:8px">
+      <div class="grade-row-inner-4" style="margin-bottom:4px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:0 8px 4px">Grade Name</div>
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:0 8px 4px;text-align:right">% <span id="pct-total-{{ li }}" class="pct-total" style="color:var(--text-muted)">(0%)</span></div>
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:0 8px 4px;text-align:right">kg <span id="kg-total-{{ li }}" class="kg-total" style="color:var(--text-muted)">(0)</span></div>
+        <div></div>
+      </div>
+      {% for gi in range(max_grades) %}
+      {% set grade = layer.grades[gi] if layer and layer.grades|length > gi else none %}
+      <div class="grade-row grade-row-inner-4" data-layer="{{ li }}" id="grade-row-{{ li }}-{{ gi }}">
+        <input type="text" name="layer_{{ li }}_grade_{{ gi }}_name"
+               id="gname-{{ li }}-{{ gi }}"
+               value="{{ grade.grade_name if grade else '' }}"
+               placeholder="Grade name (e.g. F19010)"
+               class="grade-name-input" style="padding:7px 10px;font-size:.88rem">
+        <input type="number" name="layer_{{ li }}_grade_{{ gi }}_pct"
+               id="gpct-{{ li }}-{{ gi }}"
+               value="{{ grade.percentage if grade and grade.percentage is not none else '' }}"
+               step="0.1" min="0" max="100" placeholder="%"
+               class="pct-input" data-layer="{{ li }}" data-grade="{{ gi }}"
+               style="padding:7px 10px;font-size:.88rem;text-align:right">
+        <input type="number" name="layer_{{ li }}_grade_{{ gi }}_kg"
+               id="gkg-{{ li }}-{{ gi }}"
+               value="{{ grade.kg_amount if grade and grade.kg_amount is not none else '' }}"
+               step="0.001" min="0" placeholder="kg"
+               class="kg-input" data-layer="{{ li }}"
+               style="padding:7px 10px;font-size:.88rem;text-align:right">
+        <button type="button" class="btn btn-ghost btn-sm grade-clear-btn"
+                style="padding:6px 8px;color:var(--danger);flex-shrink:0"
+                onclick="clearGrade({{ li }}, {{ gi }})"
+                title="Clear this grade">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Notes -->
+  <div class="card mb-3">
+    <div class="card-header"><h3>Notes</h3></div>
+    <div class="card-body">
+      <textarea name="notes" style="min-height:70px" placeholder="Additional notes, special instructions…">{{ recipe.notes if recipe else '' }}</textarea>
+    </div>
+  </div>
+
+  <div class="flex gap-2">
+    <button type="submit" class="btn btn-primary btn-lg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M5 12l5 5L20 7"/></svg>
+      {% if edit %}Update Recipe{% else %}Create Recipe{% endif %}
+    </button>
+    <a href="{{ url_for('recipe_index') }}" class="btn btn-ghost btn-lg">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Live % and kg totals per layer
+function updateLayerTotals(layerIdx) {
+  const pctInputs = document.querySelectorAll(`.pct-input[data-layer="${layerIdx}"]`);
+  const kgInputs  = document.querySelectorAll(`.kg-input[data-layer="${layerIdx}"]`);
+  let pctTotal = 0, kgTotal = 0;
+  pctInputs.forEach(i => pctTotal += parseFloat(i.value) || 0);
+  kgInputs.forEach(i => kgTotal  += parseFloat(i.value) || 0);
+
+  const pctEl = document.getElementById(`pct-total-${layerIdx}`);
+  const kgEl  = document.getElementById(`kg-total-${layerIdx}`);
+  if (pctEl) {
+    pctEl.textContent = `(${pctTotal.toFixed(1)}%)`;
+    pctEl.style.color = Math.abs(pctTotal - 100) < 0.1 ? 'var(--success)' : (pctTotal > 100 ? 'var(--danger)' : 'var(--text-muted)');
+  }
+  if (kgEl) kgEl.textContent = `(${kgTotal.toFixed(1)} kg)`;
+}
+
+document.querySelectorAll('.pct-input, .kg-input').forEach(input => {
+  input.addEventListener('input', function() {
+    updateLayerTotals(parseInt(this.dataset.layer));
+  });
+});
+
+// Init
+[0, 1, 2].forEach(updateLayerTotals);
+
+// ── Clear a grade row ────────────────────────────────────────────────
+function clearGrade(layerIdx, gradeIdx) {
+  document.getElementById('gname-' + layerIdx + '-' + gradeIdx).value = '';
+  document.getElementById('gpct-'  + layerIdx + '-' + gradeIdx).value = '';
+  document.getElementById('gkg-'   + layerIdx + '-' + gradeIdx).value = '';
+  updateLayerTotals(layerIdx);
+}
+
+// ── Treatment N/A toggle ──────────────────────────────────────────────
+function toggleTreatment(checkbox) {
+  document.getElementById('treatmentFields').style.display = checkbox.checked ? 'none' : 'flex';
+  if (checkbox.checked) {
+    document.getElementById('treatment_min').value = '';
+    document.getElementById('treatment_max').value = '';
+  }
+}
+
+// ── Auto-calc kg from % and target_kg ────────────────────────────────
+// When a % input changes, compute kg = (pct / 100) × target_kg for that layer.
+// Also when target_kg changes, recompute all kg in that layer.
+function autoCalcKg(layerIdx, gradeIdx) {
+  const targetInput = document.querySelector(
+    `[name="layer_${layerIdx}_target_kg"]`
+  );
+  const targetKg = parseFloat(targetInput?.value) || 0;
+  if (targetKg <= 0) return;
+
+  const pctInput = document.getElementById(`gpct-${layerIdx}-${gradeIdx}`);
+  const kgInput  = document.getElementById(`gkg-${layerIdx}-${gradeIdx}`);
+  const pct = parseFloat(pctInput?.value);
+  if (!isNaN(pct) && pct >= 0) {
+    kgInput.value = (pct / 100 * targetKg).toFixed(3);
+    updateLayerTotals(layerIdx);
+  }
+}
+
+function autoCalcAllKgForLayer(layerIdx) {
+  const targetInput = document.querySelector(
+    `[name="layer_${layerIdx}_target_kg"]`
+  );
+  const targetKg = parseFloat(targetInput?.value) || 0;
+  if (targetKg <= 0) return;
+  for (let gi = 0; gi < 6; gi++) {
+    const pctInput = document.getElementById(`gpct-${layerIdx}-${gi}`);
+    const kgInput  = document.getElementById(`gkg-${layerIdx}-${gi}`);
+    if (!pctInput || !kgInput) continue;
+    const pct = parseFloat(pctInput.value);
+    if (!isNaN(pct) && pct >= 0) {
+      kgInput.value = (pct / 100 * targetKg).toFixed(3);
+    }
+  }
+  updateLayerTotals(layerIdx);
+}
+
+// Attach listeners for % inputs
+document.querySelectorAll('.pct-input').forEach(input => {
+  input.addEventListener('input', function() {
+    autoCalcKg(parseInt(this.dataset.layer), parseInt(this.dataset.grade));
+  });
+});
+
+// Attach listeners for target_kg inputs
+[0, 1, 2].forEach(li => {
+  const targetInput = document.querySelector(`[name="layer_${li}_target_kg"]`);
+  if (targetInput) {
+    targetInput.addEventListener('input', () => autoCalcAllKgForLayer(li));
+  }
+});
+</script>
+{% endblock %}

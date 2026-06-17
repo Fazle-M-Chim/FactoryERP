@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ mat.name }} — Ledger{% endblock %}
+{% block topbar_title %}{{ mat.name }}{% endblock %}
+{% block topbar_meta %}Transaction history{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>{{ mat.name }}</h2>
+    {% if mat.description %}<p>{{ mat.description }}</p>{% endif %}
+  </div>
+  <div class="page-header-actions">
+    <span style="font-size:1.4rem;font-weight:800;
+                 color:{% if mat.current_stock_kg < 0 %}var(--danger){% else %}var(--success){% endif %}">
+      {{ '%.3f'|format(mat.current_stock_kg) }} kg
+    </span>
+    <button onclick="printLedger()" class="btn btn-outline">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Print
+    </button>
+    <a href="{{ url_for('inventory_index') }}" class="btn btn-ghost">← Inventory</a>
+  </div>
+</div>
+
+<div class="card">
+  {% if entries %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Reference</th>
+          <th class="num-cell">Qty (kg)</th>
+          <th>Notes</th>
+          <th>By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set running = namespace(total=0) %}
+        {% for e in entries | sort(attribute='created_at') %}
+        {% set running.total = running.total + e.qty_kg %}
+        {% endfor %}
+        {% set running.total = 0 %}
+        {% for e in entries %}
+        {% set running.total = running.total + e.qty_kg %}
+        <tr>
+          <td class="text-muted">{{ e.created_at | ist }}</td>
+          <td>
+            {% if e.txn_type == 'incoming' %}
+              <span class="badge status-packed">{{ e.txn_label }}</span>
+            {% elif e.txn_type == 'work_order' %}
+              <span class="badge status-production">{{ e.txn_label }}</span>
+            {% else %}
+              <span class="badge status-open">{{ e.txn_label }}</span>
+            {% endif %}
+          </td>
+          <td>{{ e.reference or '—' }}</td>
+          <td class="num-cell" style="font-weight:700;color:{% if e.qty_kg >= 0 %}var(--success){% else %}var(--danger){% endif %}">
+            {{ '%+.3f'|format(e.qty_kg) }}
+          </td>
+          <td class="text-muted" style="font-size:.82rem">{{ e.notes or '—' }}</td>
+          <td class="text-muted" style="font-size:.82rem">{{ e.created_by or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--blue-light);font-weight:700">
+          <td colspan="3" style="padding:10px 16px;color:var(--blue-primary);font-size:.82rem;text-transform:uppercase">
+            Current Balance
+          </td>
+          <td class="num-cell" style="padding:10px 16px;font-size:1rem;
+              color:{% if mat.current_stock_kg < 0 %}var(--danger){% else %}var(--success){% endif %}">
+            {{ '%.3f'|format(mat.current_stock_kg) }} kg
+          </td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Transactions</h3>
+    <p>No stock movements recorded for {{ mat.name }} yet.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function printLedger() {
+  const title = '{{ mat.name }} — Transaction Ledger — HIC Industries';
+  const stock = '{{ mat.current_stock_kg | round(3) }}';
+  const tableHTML = document.querySelector('.table-wrap')?.outerHTML || '<p>No transactions</p>';
+  const css = document.querySelector('link[rel="stylesheet"]')?.href || '';
+  const now = new Date().toLocaleDateString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <link rel="stylesheet" href="${css}">
+    <style>
+      body{font-family:Arial,sans-serif;font-size:10pt;padding:16px}
+      h2{font-size:13pt;margin-bottom:4px}
+      p.sub{font-size:9pt;color:#666;margin-bottom:12px}
+      table{width:100%;border-collapse:collapse;font-size:9.5pt}
+      th,td{border:1px solid #ccc;padding:5px 8px}
+      th{background:#f0f0f0;font-weight:700}
+      tfoot td{font-weight:700;background:#e8f0fe}
+      @page{margin:12mm}
+    </style></head><body>
+    <h2>${title}</h2>
+    <p class="sub">Printed: ${now} &nbsp;|&nbsp; Current balance: <strong>${stock} kg</strong></p>
+    ${tableHTML}
+  </body></html>`;
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 800); }, 250);
+}
+</script>
+{% endblock %}

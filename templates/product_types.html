@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Product Types{% endblock %}
+{% block topbar_title %}Product Types{% endblock %}
+{% block topbar_meta %}Settings — Manage selectable product types{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Product Types</h2>
+    <p>Add, disable, or remove the product types that appear in the Work Order form.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">← Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="two-col-layout-wide">
+
+  <!-- Add Form -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Add New Type</h3>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('product_types_manage') }}">
+        <input type="hidden" name="action" value="add">
+        <div class="form-group mb-3">
+          <label for="name">Type Name <span class="required">*</span></label>
+          <input type="text" id="name" name="name" required
+                 placeholder="e.g. Transparent, Anti-Static…"
+                 autocomplete="off" />
+          <span class="form-hint">Will appear immediately in the Work Order dropdown.</span>
+        </div>
+        <button type="submit" class="btn btn-dark w-100">Add Product Type</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Existing Types -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Existing Types</h3>
+        <p>{{ product_types | length }} type(s) total</p>
+      </div>
+    </div>
+
+    {% if product_types %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th class="text-center">Status</th>
+            <th class="actions-cell">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pt in product_types %}
+          <tr class="{% if not pt.is_active %}pt-row-disabled{% endif %}">
+            <td>
+              <strong {% if not pt.is_active %}style="color:var(--text-muted); text-decoration:line-through"{% endif %}>
+                {{ pt.name }}
+              </strong>
+            </td>
+            <td class="text-center">
+              {% if pt.is_active %}
+                <span class="badge status-packed">Active</span>
+              {% else %}
+                <span class="badge" style="background:var(--grey-100);color:var(--text-muted)">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="actions-cell">
+              <div class="flex gap-1" style="justify-content:flex-end">
+                <!-- Toggle active/disabled -->
+                <form method="POST" action="{{ url_for('product_types_manage') }}" style="margin:0">
+                  <input type="hidden" name="action" value="toggle">
+                  <input type="hidden" name="pt_id" value="{{ pt.id }}">
+                  <button type="submit" class="btn btn-ghost btn-sm">
+                    {% if pt.is_active %}Disable{% else %}Enable{% endif %}
+                  </button>
+                </form>
+                <!-- Delete -->
+                <form method="POST" action="{{ url_for('product_types_manage') }}" style="margin:0"
+                      onsubmit="return confirm('Delete \'{{ pt.name }}\'? This cannot be undone.\n\nIf any Work Orders use this type, deletion will be blocked.')">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="pt_id" value="{{ pt.id }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <h3>No product types yet</h3>
+      <p>Add your first product type using the form on the left.</p>
+    </div>
+    {% endif %}
+
+    <div style="padding:14px 20px; border-top:1px solid var(--grey-100); font-size:.8rem; color:var(--text-muted)">
+      <strong>Tip:</strong> Disabled types no longer appear in the Work Order dropdown but are preserved in existing records.
+      Deleted types are permanently removed and cannot be deleted if used in a Work Order.
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

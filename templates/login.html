@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — HIC Industries</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--blue-primary); margin:0; }
+    .login-card { background:white; border-radius:12px; padding:40px 36px; width:360px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+    .login-logo { text-align:center; margin-bottom:28px; }
+    .login-logo h1 { font-size:1.6rem; font-weight:800; color:var(--blue-primary); margin:0 0 4px; letter-spacing:.02em; }
+    .login-logo p { font-size:.82rem; color:var(--text-muted); margin:0; }
+    .login-card .form-group { margin-bottom:16px; }
+    .login-card label { display:block; font-size:.82rem; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.06em; }
+    .login-card input { width:100%; padding:10px 12px; border:1.5px solid var(--grey-200); border-radius:var(--radius); font-size:.95rem; font-family:inherit; box-sizing:border-box; }
+    .login-card input:focus { outline:none; border-color:var(--blue-accent); box-shadow:0 0 0 3px rgba(46,134,222,.15); }
+    .login-btn { width:100%; padding:11px; background:var(--blue-accent); color:white; border:none; border-radius:var(--radius); font-size:1rem; font-weight:700; cursor:pointer; margin-top:8px; transition:background .15s; }
+    .login-btn:hover { background:var(--blue-primary); }
+    .login-flash { padding:10px 14px; border-radius:var(--radius); font-size:.85rem; margin-bottom:16px; background:#FEE2E2; color:#991B1B; border:1px solid #FECACA; }
+    .login-footer { text-align:center; margin-top:20px; font-size:.78rem; color:var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>HIC Industries</h1>
+      <p>Production Management System</p>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="login-flash">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required autofocus autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div class="login-footer">HIC Industries v1.0 · Local Build</div>
+  </div>
+</body>
+</html>

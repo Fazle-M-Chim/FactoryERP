@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+{% block title %}{% if edit %}Edit{% else %}New{% endif %} Work Order{% endblock %}
+{% block topbar_title %}{% if edit %}Edit Work Order{% else %}New Work Order{% endif %}{% endblock %}
+{% block topbar_meta %}Step 1 of 5{% endblock %}
+
+{% block content %}
+
+<div class="steps-bar">
+  <div class="step-item active">
+    <div class="step-num">1</div>
+    <div class="step-info"><div class="step-label">Work Order</div><div class="step-sublabel">Customer order</div></div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">2</div>
+    <div class="step-info"><div class="step-label">Production</div><div class="step-sublabel">Log rolls</div></div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">3</div>
+    <div class="step-info"><div class="step-label">Packing List</div><div class="step-sublabel">Review &amp; finalise</div></div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">4</div>
+    <div class="step-info"><div class="step-label">Dispatch (DM)</div><div class="step-sublabel">Material challan</div></div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">5</div>
+    <div class="step-info"><div class="step-label">Billing</div><div class="step-sublabel">Invoice customer</div></div>
+  </div>
+</div>
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>{% if edit %}Edit Work Order{% else %}Create New Work Order{% endif %}</h2>
+    <p>{% if edit %}Update the details for {{ wo.wo_number }}{% else %}Enter the details received from your customer{% endif %}</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+
+<form method="POST" action="{% if edit %}{{ url_for('work_order_edit', wo_id=wo.id) }}{% else %}{{ url_for('work_order_new') }}{% endif %}">
+
+  <!-- Order Information -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <div>
+        <h3>Order Information</h3>
+        <p>Work order number and customer details</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+
+        <!-- WO Number -->
+        <div class="form-group">
+          <label for="wo_number">WO Number <span class="required">*</span></label>
+          {% if edit %}
+            <input type="text" id="wo_number" name="wo_number" value="{{ wo.wo_number }}" readonly />
+            <span class="form-hint">Cannot be changed after creation.</span>
+          {% else %}
+            <input type="text" id="wo_number" name="wo_number"
+                   value="{{ form.wo_number if form.wo_number else next_wo }}"
+                   placeholder="e.g. WO8000" required autocomplete="off" />
+            <span class="form-hint">Auto-filled — edit if needed.</span>
+          {% endif %}
+        </div>
+
+        <!-- Customer dropdown -->
+        <div class="form-group">
+          <label for="customer_id">
+            Customer <span class="required">*</span>
+            <a href="{{ url_for('customers_manage') }}" class="label-action-link" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit Customers
+            </a>
+          </label>
+          {% if customers %}
+            <select id="customer_id" name="customer_id" required>
+              <option value="">— Select customer —</option>
+              {% for c in customers %}
+              <option value="{{ c.id }}"
+                {% if edit and wo.customer_id == c.id %}selected
+                {% elif form and form.get and form.get('customer_id')|string == c.id|string %}selected{% endif %}>
+                {{ c.name }}
+              </option>
+              {% endfor %}
+            </select>
+            <span class="form-hint" id="customerAddressHint" style="display:none; color:var(--text-muted)"></span>
+          {% else %}
+            <div class="empty-select-msg">
+              No customers yet.
+              <a href="{{ url_for('customers_manage') }}" target="_blank">Add one now →</a>
+            </div>
+            <input type="hidden" name="customer_id" value="">
+          {% endif %}
+        </div>
+
+        <!-- Product Type -->
+        <div class="form-group">
+          <label for="product_type">
+            Product Type <span class="required">*</span>
+            <a href="{{ url_for('product_types_manage') }}" class="label-action-link" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Manage
+            </a>
+          </label>
+          <select id="product_type" name="product_type" required>
+            <option value="">— Select product —</option>
+            {% for pt in product_types %}
+            <option value="{{ pt }}"
+              {% if edit and wo.product_type == pt %}selected
+              {% elif form and form.get and form.get('product_type') == pt %}selected{% endif %}>
+              {{ pt }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Recipe selector -->
+        {% if not edit %}
+        <div class="form-group">
+          <label for="recipe_id">
+            Recipe
+            <a href="{{ url_for('recipe_index') }}" class="label-action-link" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   style="width:11px;height:11px;margin-left:4px;vertical-align:middle">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+              </svg>
+              Manage Recipes
+            </a>
+          </label>
+          {% if recipes %}
+          <select id="recipe_id" name="recipe_id" onchange="loadMaterialPreview()">
+            <option value="">— No recipe (no inventory deduction) —</option>
+            {% for r in recipes %}
+            <option value="{{ r.id }}"
+              {% if form and form.get and form.get('recipe_id')|string == r.id|string %}selected{% endif %}>
+              {{ r.name }}{% if r.recipe_no %} ({{ r.recipe_no }}){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <span class="form-hint">Selecting a recipe auto-deducts raw materials from inventory when the WO is created.</span>
+          {% else %}
+          <div class="empty-select-msg">No recipes yet. <a href="{{ url_for('recipe_new') }}" target="_blank">Create one →</a></div>
+          <input type="hidden" name="recipe_id" value="">
+          {% endif %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Specifications -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <div>
+        <h3>Product Specifications</h3>
+        <p>Technical details of the film to be produced</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="form-grid form-grid-3">
+        <div class="form-group">
+          <label for="size_mm">Film Width <span class="required">*</span></label>
+          <div class="input-unit">
+            <input type="number" id="size_mm" name="size_mm"
+                   value="{{ form.size_mm if form.size_mm else '' }}"
+                   placeholder="e.g. 560" step="0.1" min="0" required />
+            <span class="unit-label">mm</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="thickness_microns">Thickness <span class="required">*</span></label>
+          <div class="input-unit">
+            <input type="number" id="thickness_microns" name="thickness_microns"
+                   value="{{ form.thickness_microns if form.thickness_microns else '' }}"
+                   placeholder="e.g. 90" step="0.5" min="0" required />
+            <span class="unit-label">µ</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="total_weight_kg">Total Order Weight <span class="required">*</span></label>
+          <div class="input-unit">
+            <input type="number" id="total_weight_kg" name="total_weight_kg"
+                   value="{{ form.total_weight_kg if form.total_weight_kg else '' }}"
+                   placeholder="e.g. 1000" step="0.1" min="0" required />
+            <span class="unit-label">kg</span>
+          </div>
+          <span class="form-hint" id="rollEstimate">
+            {% if form and form.total_weight_kg %}~{{ ((form.total_weight_kg | float) / 25) | int }} rolls @ 25 kg each{% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Material deduction preview (only on new WO with recipe) -->
+  {% if not edit %}
+  <div class="card mb-3" id="materialPreviewCard" style="display:none">
+    <div class="card-header">
+      <div>
+        <h3>Material Deduction Preview</h3>
+        <p id="previewSubtitle">Based on selected recipe and order weight</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="previewTable">
+        <thead>
+          <tr>
+            <th>Grade</th>
+            <th class="num-cell">Deduct (kg)</th>
+            <th class="num-cell">Current Stock</th>
+            <th class="num-cell">After Deduction</th>
+            <th class="text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Notes -->
+  <div class="card mb-3">
+    <div class="card-header"><h3>Additional Notes</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label for="notes">Notes / Special Instructions</label>
+        <textarea id="notes" name="notes"
+                  placeholder="Any special requirements or instructions...">{{ form.notes if form.notes else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex gap-2">
+    <button type="submit" class="btn btn-primary btn-lg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>
+      {% if edit %}Update Work Order{% else %}Create Work Order{% endif %}
+    </button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-lg">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Roll count estimate
+const wtInput = document.getElementById('total_weight_kg');
+const rollEst = document.getElementById('rollEstimate');
+if (wtInput && rollEst) {
+  wtInput.addEventListener('input', function () {
+    const kg = parseFloat(this.value) || 0;
+    rollEst.textContent = kg > 0 ? `~${Math.ceil(kg / 25)} rolls @ 25 kg each` : '';
+    loadMaterialPreview();
+  });
+}
+
+// Customer address hint
+const custSelect = document.getElementById('customer_id');
+const addrHint = document.getElementById('customerAddressHint');
+if (custSelect && addrHint) {
+  custSelect.addEventListener('change', function () {
+    const id = this.value;
+    if (!id) { addrHint.style.display = 'none'; return; }
+    fetch(`/api/customer-address?id=${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.address) {
+          addrHint.textContent = '📍 ' + data.address.replace(/\n/g, ', ');
+          addrHint.style.display = 'block';
+        } else {
+          addrHint.style.display = 'none';
+        }
+      });
+  });
+  if (custSelect.value) custSelect.dispatchEvent(new Event('change'));
+}
+
+// Material deduction preview
+function loadMaterialPreview() {
+  const recipeSelect = document.getElementById('recipe_id');
+  const card = document.getElementById('materialPreviewCard');
+  if (!recipeSelect || !card) return;
+  const recipeId = recipeSelect.value;
+  const targetKg = parseFloat(document.getElementById('total_weight_kg')?.value) || 0;
+  if (!recipeId || targetKg <= 0) { card.style.display = 'none'; return; }
+  fetch(`/api/recipe-material-preview/${recipeId}?target_kg=${targetKg}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.items || data.items.length === 0) { card.style.display = 'none'; return; }
+      document.getElementById('previewSubtitle').textContent =
+        `Recipe: ${data.recipe_name} (${data.recipe_batch_kg} kg batch) → scaled to ${targetKg} kg order`;
+      const tbody = document.getElementById('previewBody');
+      tbody.innerHTML = '';
+      data.items.forEach(item => {
+        const ok = item.ok;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><strong>${item.grade}</strong></td>
+          <td class="num-cell">${item.deduct_kg.toFixed(3)}</td>
+          <td class="num-cell">${item.current_stock.toFixed(3)}</td>
+          <td class="num-cell" style="font-weight:700;color:${ok?'var(--success)':'var(--danger)'}">
+            ${item.after_stock.toFixed(3)}
+          </td>
+          <td class="text-center">
+            ${ok
+              ? '<span class="badge status-packed">OK</span>'
+              : '<span class="badge" style="background:#FEE2E2;color:#991B1B">Insufficient</span>'}
+          </td>`;
+        tbody.appendChild(row);
+      });
+      card.style.display = 'block';
+    })
+    .catch(() => { card.style.display = 'none'; });
+}
+const recipeSelect = document.getElementById('recipe_id');
+if (recipeSelect) recipeSelect.addEventListener('change', loadMaterialPreview);
+</script>
+{% endblock %}

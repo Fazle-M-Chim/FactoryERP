@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ pl.pl_number }}{% endblock %}
+{% block topbar_title %}{{ pl.pl_number }}{% endblock %}
+{% block topbar_meta %}Packing List{% endblock %}
+
+{% block head_extra %}
+<style>
+@media print {
+  .sidebar,.topbar,.flash-container,.screen-only{display:none!important}
+  .main-wrapper{margin-left:0!important}
+  .page-content{padding:0!important}
+  body{background:white}
+  .print-doc{display:block!important;margin:0;padding:0;box-shadow:none;border:none;max-width:none}
+  @page{margin:12mm 14mm;size:A4 portrait}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="screen-only">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>{{ pl.pl_number }}</h2>
+      <p>{{ pl.work_orders|length }} work order{{ 's' if pl.work_orders|length != 1 else '' }} &nbsp;·&nbsp;
+         {{ pl.total_rolls }} rolls &nbsp;·&nbsp; {{ '%.2f'|format(pl.total_net_kg) }} kg net</p>
+    </div>
+    <div class="page-header-actions">
+      {% if pl.work_orders %}
+      <button onclick="printPL()" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Print
+      </button>
+      {% endif %}
+      {% if not pl.dispatch_memo %}
+      <a href="{{ url_for('dm_new') }}?pl_id={{ pl.id }}" class="btn btn-primary">Create Dispatch Memo →</a>
+      {% else %}
+      <a href="{{ url_for('dm_detail', dm_id=pl.dispatch_memo.id) }}" class="btn btn-primary">View DM {{ pl.dispatch_memo.dm_number }} →</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- One card per WO -->
+  {% for wo in pl.work_orders %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <div>
+        <h3>{{ wo.wo_number }} — {{ wo.customer_name }}</h3>
+        <p>{{ wo.product_type }} &nbsp;·&nbsp; {{ wo.size_mm|int }} mm × {{ wo.thickness_microns|int }} µ &nbsp;·&nbsp; {{ wo.roll_count }} rolls</p>
+      </div>
+      <div class="flex gap-1">
+        <form method="POST" action="{{ url_for('packing_list_remove_wo', pl_id=pl.id) }}" style="margin:0"
+              onsubmit="return confirm('Remove {{ wo.wo_number }} from this packing list?')">
+          <input type="hidden" name="wo_id" value="{{ wo.id }}">
+          <button type="submit" class="btn btn-ghost btn-sm">Remove WO</button>
+        </form>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>SR</th><th>Roll No.</th>
+          <th class="num-cell">Gross (kg)</th>
+          <th class="num-cell">Core (kg)</th>
+          <th class="num-cell">Net (kg)</th>
+        </tr></thead>
+        <tbody>
+          {% for roll in wo.rolls %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td><strong>{{ roll.roll_no }}</strong></td>
+            <td class="num-cell">{{ '%.2f'|format(roll.gross_weight_kg) }}</td>
+            <td class="num-cell">{{ '%.2f'|format(roll.core_weight_kg) }}</td>
+            <td class="num-cell" style="font-weight:600;color:var(--blue-primary)">{{ '%.2f'|format(roll.net_weight_kg) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="font-weight:700;background:var(--blue-light)">
+            <td colspan="2" style="padding:8px 16px;color:var(--blue-primary);font-size:.8rem;text-transform:uppercase">WO Total</td>
+            <td class="num-cell" style="padding:8px 16px">{{ '%.2f'|format(wo.total_gross_kg) }}</td>
+            <td class="num-cell" style="padding:8px 16px">{{ '%.2f'|format(wo.total_core_kg) }}</td>
+            <td class="num-cell" style="padding:8px 16px;color:var(--blue-primary)">{{ '%.2f'|format(wo.total_produced_kg) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Grand totals -->
+  <div class="card" style="background:var(--blue-light)">
+    <div class="card-body" style="display:flex;gap:32px;align-items:center;padding:16px 20px">
+      <div><div class="detail-label">Total WOs</div><div class="detail-value big">{{ pl.work_orders|length }}</div></div>
+      <div><div class="detail-label">Total Rolls</div><div class="detail-value big">{{ pl.total_rolls }}</div></div>
+      <div><div class="detail-label">Gross Weight</div><div class="detail-value big">{{ '%.2f'|format(pl.total_gross_kg) }} kg</div></div>
+      <div><div class="detail-label">Core Weight</div><div class="detail-value big">{{ '%.2f'|format(pl.total_core_kg) }} kg</div></div>
+      <div><div class="detail-label">Net Weight</div><div class="detail-value big" style="color:var(--blue-primary)">{{ '%.2f'|format(pl.total_net_kg) }} kg</div></div>
+      <div style="flex:1"></div>
+      {% if not pl.dispatch_memo %}
+      <form method="POST" action="{{ url_for('packing_list_delete', pl_id=pl.id) }}"
+            onsubmit="return confirm('Delete {{ pl.pl_number }}? This cannot be undone.')">
+        <button type="submit" class="btn btn-danger btn-sm">Delete PL</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div><!-- /.screen-only -->
+
+<!-- ══ PRINT DOCUMENT ══════════════════════════════════════════════════════ -->
+{% if pl.work_orders %}
+<div class="print-preview-header screen-only" style="margin-top:28px">
+  <div class="ppv-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+      <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Print Preview (one table per WO)
+  </div>
+  <div class="ppv-controls">
+    <div class="ppv-dm-field">
+      <label for="dmNoInput">DM No.</label>
+      <input type="text" id="dmNoInput"
+             value="{{ pl.dispatch_memo.dm_number if pl.dispatch_memo else '' }}"
+             placeholder="e.g. 5410" style="width:90px">
+    </div>
+    <button onclick="printPL()" class="btn btn-primary btn-sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Print
+    </button>
+  </div>
+</div>
+
+<div class="print-doc" id="printDoc" style="display:block">
+  <div class="pl-wrap">
+    {% for wo in pl.work_orders %}
+    {% set rolls = wo.rolls %}
+
+    <table class="pl-outer" cellspacing="0" cellpadding="0" {% if not loop.last %}style="margin-bottom:18mm"{% endif %}>
+      <tr>
+        <td class="pl-main-td">
+          <table class="pl-main" cellspacing="0" cellpadding="0">
+
+            <tr><td colspan="5" class="pl-header-row">
+              PACKING LIST — {{ wo.customer_name | upper }}
+            </td></tr>
+
+            <tr><td colspan="5" class="pl-spec-row">
+              {{ wo.product_type | upper }}
+              &nbsp; {{ wo.size_mm|int }} MM &nbsp;×&nbsp; {{ wo.thickness_microns|int }} MIC.
+            </td></tr>
+
+            <tr class="pl-col-header">
+              <th class="pl-sr">SR NO.</th>
+              <th class="pl-roll">ROLL NO.</th>
+              <th class="pl-wt">GROSS WT.</th>
+              <th class="pl-wt">CORE WT.</th>
+              <th class="pl-wt">NET WT.</th>
+            </tr>
+
+            {% for roll in rolls %}
+            <tr class="pl-data-row {% if loop.index is odd %}pl-row-odd{% endif %}">
+              <td class="pl-sr pl-center">{{ loop.index }}</td>
+              <td class="pl-roll">{{ roll.roll_no }}</td>
+              <td class="pl-wt pl-right">{{ '%.2f'|format(roll.gross_weight_kg) }}</td>
+              <td class="pl-wt pl-right">{{ '%.2f'|format(roll.core_weight_kg) }}</td>
+              <td class="pl-wt pl-right">{{ '%.2f'|format(roll.net_weight_kg) }}</td>
+            </tr>
+            {% endfor %}
+
+            <tr class="pl-total-row">
+              <td colspan="2" class="pl-center pl-bold">TOTAL</td>
+              <td class="pl-wt pl-right pl-bold">{{ '%.2f'|format(wo.total_gross_kg) }}</td>
+              <td class="pl-wt pl-right pl-bold">{{ '%.2f'|format(wo.total_core_kg) }}</td>
+              <td class="pl-wt pl-right pl-bold">{{ '%.2f'|format(wo.total_produced_kg) }}</td>
+            </tr>
+
+          </table>
+        </td>
+        <td class="pl-sidebar-td">
+          <div class="pl-sidebar">
+            <div class="pl-side-item">
+              <span class="pl-side-label">DATE</span>
+              <span class="pl-side-value">{{ today }}</span>
+            </div>
+            <div class="pl-side-item">
+              <span class="pl-side-label">WO. NO.</span>
+              <span class="pl-side-value">{{ wo.wo_number | replace('WO','') }}</span>
+            </div>
+            <div class="pl-side-item">
+              <span class="pl-side-label">DM NO.</span>
+              <span class="pl-side-value dm-no-val">{{ pl.dispatch_memo.dm_number if pl.dispatch_memo else '—' }}</span>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dmInput = document.getElementById('dmNoInput');
+document.querySelectorAll('.dm-no-val').forEach(el => {
+  if (dmInput) dmInput.addEventListener('input', () => {
+    el.textContent = dmInput.value.trim() || '—';
+  });
+});
+
+function printPL() {
+  const docEl = document.getElementById('printDoc');
+  if (!docEl) return;
+  const styleBlocks = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
+  const linkHref = document.querySelector('link[rel="stylesheet"]')?.href || '';
+  const linkTag = linkHref ? `<link rel="stylesheet" href="${linkHref}">` : '';
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title></title>${linkTag}${styleBlocks}
+    <style>body{margin:0;padding:0;background:white}.print-doc{display:block!important;margin:0;padding:14mm 14mm 12mm;box-shadow:none;border:none;max-width:none}@page{margin:0;size:A4 portrait}</style>
+    </head><body>${docEl.outerHTML}</body></html>`;
+  const popup = window.open('', '_blank', 'width=794,height=1123');
+  popup.document.write(html);
+  popup.document.close();
+  popup.onload = () => setTimeout(() => { popup.focus(); popup.print(); setTimeout(() => popup.close(), 1000); }, 300);
+}
+</script>
+{% endblock %}

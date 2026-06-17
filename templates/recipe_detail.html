@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{{ recipe.name }}{% endblock %}
+{% block topbar_title %}{{ recipe.name }}{% endblock %}
+{% block topbar_meta %}Recipe Sheet{% endblock %}
+
+{% block head_extra %}
+<style>
+@media print {
+  .sidebar,.topbar,.flash-container,.screen-only { display:none !important; }
+  .main-wrapper { margin-left:0 !important; }
+  .page-content  { padding:0 !important; }
+  body { background:white; }
+  .recipe-print { display:block !important; margin:0; padding:0;
+                  box-shadow:none; border:none; max-width:none; }
+  @page { margin:12mm 14mm; size:A4 portrait; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Screen action bar ───────────────────────────────────────────────── -->
+<div class="screen-only">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>{{ recipe.name }}</h2>
+      <p>{{ recipe.product_type or '' }}{% if recipe.recipe_no %} &nbsp;·&nbsp; No. {{ recipe.recipe_no }}{% endif %}{% if recipe.date %} &nbsp;·&nbsp; {{ recipe.date | fmt_date }}{% endif %}</p>
+    </div>
+    <div class="page-header-actions">
+      <a href="{{ url_for('recipe_edit', recipe_id=recipe.id) }}" class="btn btn-ghost">Edit</a>
+      <button onclick="printRecipe()" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Print
+      </button>
+      <a href="{{ url_for('recipe_index') }}" class="btn btn-ghost">← All Recipes</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RECIPE DOCUMENT (shown on screen + printed) ════════════════════════ -->
+<div class="recipe-print" id="recipePrintDoc" style="display:block">
+<div class="rp-doc">
+
+  {# ── HEADER ──────────────────────────────────────────────────────────── #}
+  <div class="rp-hdr">
+    <span class="rp-hdr-date">{% if recipe.date %}{{ recipe.date | fmt_date }}.{% endif %}</span>
+    <span class="rp-hdr-title">{{ recipe.name }}.</span>
+    <span class="rp-hdr-no">{% if recipe.recipe_no %}{{ recipe.recipe_no }}{% endif %}</span>
+  </div>
+
+  {# ── TREATMENT + LAYER META ───────────────────────────────────────────── #}
+  {% if recipe.treatment_min or recipe.treatment_max or recipe.layer_ratio %}
+  <div class="rp-meta">
+    {% if recipe.treatment_na %}
+    <div class="rp-treatment" style="color:#555">Treatment = N/A</div>
+    {% elif recipe.treatment_min or recipe.treatment_max %}
+    <div class="rp-treatment">Treatment = {{ recipe.treatment_min|int if recipe.treatment_min else '?' }} to {{ recipe.treatment_max|int if recipe.treatment_max else '?' }} Dynes</div>
+    {% endif %}
+    {% if recipe.layer_ratio %}
+    <div class="rp-layer-ratio">Layer Ratio = {{ recipe.layer_ratio }}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── LAYERS — text-style layout matching handwritten sheet ──────────────
+     Each layer renders as:
+       LayerName.  Grade1 + Grade2 + Grade3
+                   20%    + 10%    + 70%.
+                   20kg   + 10kg   + 70kg   ────────  100kg
+  #}
+  <div class="rp-layers-block">
+    {% set grand_total_kg = namespace(val=0) %}
+
+    {% for layer in recipe.layers %}
+    {% set filled = layer.grades | selectattr('grade_name') | list %}
+    {% if filled %}
+    {% set grand_total_kg.val = grand_total_kg.val + layer.total_kg %}
+
+    <div class="rp-layer-row">
+
+      {# Layer label #}
+      <span class="rp-lbl">{{ layer.layer_name }}.</span>
+
+      {# Grade names line — e.g. "F19010 + 1005FY20 + 1018RK" #}
+      <div class="rp-layer-content">
+        <div class="rp-grades-line rp-grades-name">
+          {% for g in filled %}
+          <span class="rp-grade-cell">{{ g.grade_name }}</span>
+          {% if not loop.last %}<span class="rp-plus">+</span>{% endif %}
+          {% endfor %}
+        </div>
+
+        {# Percentages line #}
+        <div class="rp-grades-line rp-grades-pct">
+          {% for g in filled %}
+          <span class="rp-grade-cell">{{ ('%.0f'|format(g.percentage)) if g.percentage is not none else '—' }}%</span>
+          {% if not loop.last %}<span class="rp-plus">+</span>{% endif %}
+          {% endfor %}
+          <span class="rp-pct-dot">.</span>
+        </div>
+
+        {# kg line + dashed line + total #}
+        <div class="rp-grades-line rp-grades-kg">
+          {% for g in filled %}
+          <span class="rp-grade-cell">{{ ('%.0f'|format(g.kg_amount)) if g.kg_amount is not none else '—' }}kg</span>
+          {% if not loop.last %}<span class="rp-plus">+</span>{% endif %}
+          {% endfor %}
+          <span class="rp-kg-dash"></span>
+          <span class="rp-kg-total">{{ '%.0f'|format(layer.total_kg) }} kg</span>
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {# Grand total line under all layers #}
+    <div class="rp-grand-total-line">
+      <span class="rp-grand-dash"></span>
+      <span class="rp-grand-val">{{ '%.0f'|format(grand_total_kg.val) }} kg</span>
+    </div>
+  </div>
+
+  {# ── MATERIAL REQUIRED ───────────────────────────────────────────────────
+     Matches the handwritten format exactly:
+     Underlined heading, then numbered list showing per-grade breakdown.
+
+     1) F19010   = 20+80  = 100 × 1.03 = 103  →  213
+     The "20+80" shows how much of that grade comes from each layer.
+  #}
+  {% if recipe.material_tally %}
+  <div class="rp-mat-req">
+    <div class="rp-mat-title">Material Required</div>
+
+    {# tally = {grade_name: net_kg_across_all_layers} #}
+    {% set tally = recipe.material_tally %}
+    {% set net_total = namespace(val=0) %}
+
+    {% for grade_name, net_kg in tally.items() %}
+    {% set net_total.val = net_total.val + net_kg %}
+
+    {# Per-layer breakdown string: "20 + 80" #}
+    {% set layer_kgs = [] %}
+    {% for layer in recipe.layers %}
+      {% for g in layer.grades %}
+        {% if g.grade_name == grade_name and g.kg_amount %}
+          {% set _ = layer_kgs.append('%.0f'|format(g.kg_amount)) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    <div class="rp-mat-row">
+      <span class="rp-mat-idx">{{ loop.index }})</span>
+      <span class="rp-mat-name">{{ grade_name }}</span>
+      <span class="rp-mat-eq">= {{ layer_kgs | join(' + ') }}</span>
+      <span class="rp-mat-sep">= {{ '%.0f'|format(net_kg) }}</span>
+      <span class="rp-mat-factor">× 1.03</span>
+      <span class="rp-mat-gross">= {{ '%.1f'|format(net_kg * 1.03) }}</span>
+    </div>
+    {% endfor %}
+
+    {# Totals line: sum once at the end, round once #}
+    {# net_total and gross_total are the only numbers that matter #}
+    {% set gross_total_val = (net_total.val * 1.03) | round(1) %}
+    <div class="rp-mat-totals">
+      <span class="rp-mat-totals-label">TOTAL</span>
+      <span class="rp-mat-totals-net">{{ '%.0f'|format(net_total.val) }} kg</span>
+      <span class="rp-mat-totals-x">× 1.03</span>
+      <span class="rp-mat-totals-gross">{{ '%.1f'|format(gross_total_val) }} kg</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if recipe.notes %}
+  <div class="rp-notes">{{ recipe.notes }}</div>
+  {% endif %}
+
+</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printRecipe() {
+  const docEl = document.getElementById('recipePrintDoc');
+  if (!docEl) return;
+  const styleBlocks = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
+  const linkHref = document.querySelector('link[rel="stylesheet"]')?.href || '';
+  const linkTag  = linkHref ? `<link rel="stylesheet" href="${linkHref}">` : '';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title></title>
+    ${linkTag}${styleBlocks}
+    <style>
+      body { margin:0; padding:0; background:white; }
+      .recipe-print { display:block !important; margin:0; padding:12mm 14mm;
+                      box-shadow:none; border:none; max-width:none; }
+      @page { margin:0; size:A4 portrait; }
+    </style>
+    </head><body>${docEl.outerHTML}</body></html>`;
+  const popup = window.open('', '_blank', 'width=794,height=1123');
+  popup.document.write(html);
+  popup.document.close();
+  popup.onload = () => setTimeout(() => {
+    popup.focus();
+    popup.print();
+    setTimeout(() => popup.close(), 1000);
+  }, 300);
+}
+</script>
+{% endblock %}

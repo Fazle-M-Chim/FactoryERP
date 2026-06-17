@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}New Packing List{% endblock %}
+{% block topbar_title %}New Packing List{% endblock %}
+{% block topbar_meta %}Select work orders to pack together{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Create Packing List</h2>
+    <p>Select one or more Ready work orders to include in this packing document.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('packing_list_index') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+
+{% if ready_wos %}
+<form method="POST" action="{{ url_for('packing_list_new') }}" id="plForm">
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <div>
+        <h3>Select Work Orders</h3>
+        <p>Only work orders marked as <strong>Ready</strong> appear here. Tick the ones to pack together.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAll(true)">Select All</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleAll(false)">Clear</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="woTable">
+        <thead>
+          <tr>
+            <th style="width:40px"></th>
+            <th>WO No.</th>
+            <th>Customer</th>
+            <th>Product</th>
+            <th class="num-cell">Size</th>
+            <th class="num-cell">Thickness</th>
+            <th class="num-cell">Rolls</th>
+            <th class="num-cell">Net Weight</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for wo in ready_wos %}
+          <tr class="wo-select-row" data-net="{{ wo.total_produced_kg }}" data-rolls="{{ wo.roll_count }}"
+              onclick="toggleRow(this)">
+            <td onclick="event.stopPropagation()">
+              <input type="checkbox" name="wo_ids" value="{{ wo.id }}" class="wo-check"
+                     onchange="updateSummary()" style="width:16px;height:16px;cursor:pointer">
+            </td>
+            <td><strong style="color:var(--blue-primary)">{{ wo.wo_number }}</strong></td>
+            <td>{{ wo.customer_name }}</td>
+            <td>{{ wo.product_type }}</td>
+            <td class="num-cell">{{ wo.size_mm|int }} mm</td>
+            <td class="num-cell">{{ wo.thickness_microns|int }} µ</td>
+            <td class="num-cell">{{ wo.roll_count }}</td>
+            <td class="num-cell"><strong>{{ '%.2f'|format(wo.total_produced_kg) }} kg</strong></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Live summary bar -->
+    <div class="pl-summary-bar" id="summaryBar" style="display:none">
+      <span>Selected: <strong id="sumWos">0</strong> WOs</span>
+      <span><strong id="sumRolls">0</strong> rolls</span>
+      <span>Net: <strong id="sumNet">0.00</strong> kg</span>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><h3>Notes (optional)</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <textarea name="notes" placeholder="Any packing notes…" style="min-height:60px"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex gap-2">
+    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M5 12l5 5L20 7"/></svg>
+      Create Packing List
+    </button>
+    <a href="{{ url_for('packing_list_index') }}" class="btn btn-ghost btn-lg">Cancel</a>
+  </div>
+</form>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/>
+    </svg>
+    <h3>No Ready Work Orders</h3>
+    <p>Go to a work order's production page and mark it as Ready when production is complete.</p>
+    <a href="{{ url_for('dashboard', status='in_production') }}" class="btn btn-outline mt-2">View In Production →</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRow(row) {
+  const cb = row.querySelector('.wo-check');
+  cb.checked = !cb.checked;
+  row.classList.toggle('wo-row-selected', cb.checked);
+  updateSummary();
+}
+
+function toggleAll(state) {
+  document.querySelectorAll('.wo-check').forEach(cb => {
+    cb.checked = state;
+    cb.closest('tr').classList.toggle('wo-row-selected', state);
+  });
+  updateSummary();
+}
+
+function updateSummary() {
+  const checks = [...document.querySelectorAll('.wo-check:checked')];
+  const bar = document.getElementById('summaryBar');
+  const btn = document.getElementById('submitBtn');
+  
+  if (checks.length === 0) {
+    bar.style.display = 'none';
+    btn.disabled = true;
+    return;
+  }
+  
+  let rolls = 0, net = 0;
+  checks.forEach(cb => {
+    const row = cb.closest('tr');
+    rolls += parseInt(row.dataset.rolls) || 0;
+    net   += parseFloat(row.dataset.net)  || 0;
+  });
+
+  document.getElementById('sumWos').textContent = checks.length;
+  document.getElementById('sumRolls').textContent = rolls;
+  document.getElementById('sumNet').textContent = net.toFixed(2);
+  bar.style.display = 'flex';
+  btn.disabled = false;
+}
+</script>
+{% endblock %}

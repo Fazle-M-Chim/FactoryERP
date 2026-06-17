@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Edit DM {{ dm.dm_number }}{% endblock %}
+{% block topbar_title %}Edit Dispatch Memo{% endblock %}
+{% block topbar_meta %}{{ dm.dm_number }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text"><h2>Edit DM {{ dm.dm_number }}</h2></div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('dm_detail', dm_id=dm.id) }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+<div style="max-width:480px">
+  <div class="card">
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('dm_edit', dm_id=dm.id) }}">
+        <div class="form-group mb-2">
+          <label>Dispatch Date <span class="required">*</span></label>
+          <input type="date" name="dispatch_date" value="{{ dm.dispatch_date.isoformat() }}" required>
+        </div>
+        <div class="form-group mb-2">
+          <label>Vehicle Number</label>
+          <input type="text" name="vehicle_number" value="{{ dm.vehicle_number }}">
+        </div>
+        <div class="form-group mb-2">
+          <label>Customer Name</label>
+          <input type="text" name="customer_name" value="{{ dm.customer_name }}">
+        </div>
+        <div class="form-group mb-3">
+          <label>Delivery Address</label>
+          <textarea name="customer_address" style="min-height:80px">{{ dm.customer_address }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Save Changes</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

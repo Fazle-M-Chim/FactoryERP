@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}{{ wo.wo_number }}{% endblock %}
+{% block topbar_title %}{{ wo.wo_number }}{% endblock %}
+{% block topbar_meta %}Work Order — {{ wo.customer_name }}{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('work_order_edit', wo_id=wo.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+  <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary btn-sm">
+    {% if wo.status == 'open' %}Start Production{% else %}Production{% endif %} →
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Status bar — simplified for new non-linear workflow -->
+<div class="steps-bar">
+  <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}"
+     class="step-item {% if wo.status == 'open' %}active{% else %}done{% endif %}">
+    <div class="step-num">{% if wo.status != 'open' %}✓{% else %}1{% endif %}</div>
+    <div class="step-info">
+      <div class="step-label">Work Order</div>
+      <div class="step-sublabel">{{ wo.wo_number }}</div>
+    </div>
+  </a>
+  <div class="step-connector"></div>
+  <a href="{{ url_for('production', wo_id=wo.id) }}"
+     class="step-item {% if wo.status == 'in_production' %}active{% elif wo.status in ['ready','dispatched'] %}done{% endif %}">
+    <div class="step-num">{% if wo.status in ['ready','dispatched'] %}✓{% else %}2{% endif %}</div>
+    <div class="step-info">
+      <div class="step-label">Production</div>
+      <div class="step-sublabel">{{ wo.roll_count }} rolls</div>
+    </div>
+  </a>
+  <div class="step-connector"></div>
+  <a href="{{ url_for('packing_list_index') }}"
+     class="step-item {% if wo.status == 'ready' %}active{% elif wo.status == 'dispatched' %}done{% endif %}">
+    <div class="step-num">{% if wo.status == 'dispatched' %}✓{% else %}3{% endif %}</div>
+    <div class="step-info">
+      <div class="step-label">Packing List</div>
+      <div class="step-sublabel">{% if wo.status == 'ready' %}Ready to pack{% elif wo.status == 'dispatched' %}Packed{% else %}Pending{% endif %}</div>
+    </div>
+  </a>
+  <div class="step-connector"></div>
+  <a href="{{ url_for('dm_index') }}"
+     class="step-item {% if wo.status == 'dispatched' %}done{% endif %}">
+    <div class="step-num">{% if wo.status == 'dispatched' %}✓{% else %}4{% endif %}</div>
+    <div class="step-info">
+      <div class="step-label">Dispatch (DM)</div>
+      <div class="step-sublabel">{% if wo.status == 'dispatched' %}Dispatched{% else %}Pending{% endif %}</div>
+    </div>
+  </a>
+</div>
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>{{ wo.wo_number }} — {{ wo.customer_name }}</h2>
+    <p>Created {{ wo.created_at | ist | truncate(10, True, '') }} · {{ wo.product_type }}</p>
+  </div>
+  <div class="page-header-actions">
+    <span class="badge {{ wo.status_css }}" style="font-size:.85rem; padding:6px 14px">{{ wo.status_label }}</span>
+    <a href="{{ url_for('work_order_edit', wo_id=wo.id) }}" class="btn btn-ghost">Edit</a>
+    <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary">
+      {% if wo.status == 'open' %}Start Production{% else %}View Production{% endif %} →
+    </a>
+  </div>
+</div>
+
+<div class="wo-detail-layout">
+
+  <!-- Left: Details -->
+  <div>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3>Order Details</h3>
+      </div>
+      <div class="card-body">
+        <div class="detail-grid">
+          <div class="detail-item">
+            <div class="detail-label">Work Order No.</div>
+            <div class="detail-value big">{{ wo.wo_number }}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Customer</div>
+            <div class="detail-value">{{ wo.customer_name }}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Product Type</div>
+            <div class="detail-value">{{ wo.product_type }}</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Film Width</div>
+            <div class="detail-value">{{ wo.size_mm | int }} mm</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Thickness</div>
+            <div class="detail-value">{{ wo.thickness_microns | int }} microns</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Order Weight</div>
+            <div class="detail-value">{{ wo.total_weight_kg | int }} kg</div>
+          </div>
+        </div>
+        {% if wo.notes %}
+        <div class="divider"></div>
+        <div class="detail-item">
+          <div class="detail-label">Notes</div>
+          <div class="detail-value" style="font-weight:400; font-size:.9rem; color:var(--text-muted)">{{ wo.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if wo.rolls %}
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Production Overview</h3>
+          <p>{{ wo.roll_count }} rolls produced</p>
+        </div>
+        <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">View All Rolls</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Roll No.</th>
+              <th class="num-cell">Size</th>
+              <th class="num-cell">Thickness</th>
+              <th class="num-cell">Net Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for roll in wo.rolls[-5:] %}
+            <tr>
+              <td><strong>{{ roll.roll_no }}</strong></td>
+              <td class="num-cell">{{ roll.size_mm | int }} mm</td>
+              <td class="num-cell">{{ roll.thickness_microns | int }} µ</td>
+              <td class="num-cell">{{ '%.3f'|format(roll.net_weight_kg) }} kg</td>
+            </tr>
+            {% endfor %}
+            {% if wo.roll_count > 5 %}
+            <tr>
+              <td colspan="4" style="text-align:center; color:var(--text-muted); font-size:.8rem; padding:10px">
+                … and {{ wo.roll_count - 5 }} more rolls
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Progress & Actions -->
+  <div>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h3>Production Progress</h3>
+      </div>
+      <div class="card-body">
+        <div style="margin-bottom:16px">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+            <span style="font-size:.8rem; color:var(--text-muted)">Produced vs Target</span>
+            <span style="font-size:.8rem; font-weight:700; color:var(--blue-primary)">{{ wo.progress_pct }}%</span>
+          </div>
+          <div class="progress-bar-outer" style="height:12px">
+            <div class="progress-bar-inner {% if wo.progress_pct >= 100 %}full{% endif %}"
+                 style="width:{{ wo.progress_pct }}%; height:12px"></div>
+          </div>
+        </div>
+        <div class="detail-grid" style="grid-template-columns:1fr 1fr">
+          <div class="detail-item">
+            <div class="detail-label">Target</div>
+            <div class="detail-value">{{ wo.total_weight_kg | int }} kg</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Produced</div>
+            <div class="detail-value">{{ '%.2f'|format(wo.total_produced_kg) }} kg</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Remaining</div>
+            <div class="detail-value">{{ '%.2f'|format([wo.total_weight_kg - wo.total_produced_kg, 0]|max) }} kg</div>
+          </div>
+          <div class="detail-item">
+            <div class="detail-label">Rolls Made</div>
+            <div class="detail-value">{{ wo.roll_count }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>Quick Actions</h3>
+      </div>
+      <div class="card-body" style="display:flex; flex-direction:column; gap:10px">
+        <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary w-100">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+            <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/>
+          </svg>
+          {% if wo.status == 'open' %}Start Production{% else %}Log Rolls{% endif %}
+        </a>
+        <a href="{{ url_for('packing_list_index') }}" class="btn btn-outline w-100">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          Packing Lists
+        </a>
+        <a href="{{ url_for('dm_index') }}" class="btn btn-outline w-100">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+            <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/>
+          </svg>
+          Dispatch Memos
+        </a>
+        <div class="divider mt-0 mb-0"></div>
+        <form method="POST" action="{{ url_for('work_order_delete', wo_id=wo.id) }}"
+              onsubmit="return confirm('Delete this work order and ALL its data? This cannot be undone.')">
+          <button type="submit" class="btn btn-danger w-100">Delete Work Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

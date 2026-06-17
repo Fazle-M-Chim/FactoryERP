@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Packing Lists{% endblock %}
+{% block topbar_title %}Packing Lists{% endblock %}
+{% block topbar_meta %}All packing documents{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('packing_list_new') }}" class="btn btn-primary btn-sm"
+     {% if not ready_wos %}style="opacity:.5; pointer-events:none" title="No Ready work orders"{% endif %}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+    New Packing List
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Packing Lists</h2>
+    <p>Group ready work orders into a packing document, then create a Dispatch Memo.</p>
+  </div>
+</div>
+
+{% if ready_wos %}
+<div class="info-banner">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+  </svg>
+  <span><strong>{{ ready_wos|length }} work order{{ 's' if ready_wos|length != 1 else '' }} ready to pack:</strong>
+    {% for wo in ready_wos %}
+      <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}" style="color:var(--blue-accent)">{{ wo.wo_number }}</a>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+    — <a href="{{ url_for('packing_list_new') }}" style="font-weight:700">Create Packing List →</a>
+  </span>
+</div>
+{% endif %}
+
+<div class="card">
+  {% if packing_lists %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>PL Number</th>
+          <th>Work Orders</th>
+          <th class="num-cell">Rolls</th>
+          <th class="num-cell">Net Weight</th>
+          <th>DM Status</th>
+          <th>Created</th>
+          <th class="actions-cell">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pl in packing_lists %}
+        <tr style="cursor:pointer" onclick="window.location='{{ url_for('packing_list_detail', pl_id=pl.id) }}'">
+          <td><strong style="color:var(--blue-primary)">{{ pl.pl_number }}</strong></td>
+          <td>
+            {% for wo in pl.work_orders %}
+              <span class="badge status-production" style="font-size:.72rem; margin-right:3px">{{ wo.wo_number }}</span>
+            {% endfor %}
+          </td>
+          <td class="num-cell">{{ pl.total_rolls }}</td>
+          <td class="num-cell">{{ '%.2f'|format(pl.total_net_kg) }} kg</td>
+          <td>
+            {% if pl.dispatch_memo %}
+              <span class="badge status-dispatched">DM {{ pl.dispatch_memo.dm_number }}</span>
+            {% else %}
+              <span class="badge status-open">Pending DM</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ pl.created_at | ist | truncate(10, True, '') }}</td>
+          <td class="actions-cell" onclick="event.stopPropagation()">
+            <div class="flex gap-1">
+              <a href="{{ url_for('packing_list_detail', pl_id=pl.id) }}" class="btn btn-ghost btn-sm">View</a>
+              {% if not pl.dispatch_memo %}
+              <a href="{{ url_for('dm_new') }}?pl_id={{ pl.id }}" class="btn btn-outline btn-sm">Create DM</a>
+              {% else %}
+              <a href="{{ url_for('dm_detail', dm_id=pl.dispatch_memo.id) }}" class="btn btn-outline btn-sm">View DM</a>
+              {% endif %}
+              <form method="POST" action="{{ url_for('packing_list_delete', pl_id=pl.id) }}" style="margin:0"
+                    onsubmit="return confirm('Delete {{ pl.pl_number }}? This cannot be undone.\n\nNote: any linked Dispatch Memo must be deleted first.')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+    </svg>
+    <h3>No Packing Lists Yet</h3>
+    <p>Mark work orders as Ready from the production page, then create a packing list here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

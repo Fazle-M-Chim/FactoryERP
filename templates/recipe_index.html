@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Recipes{% endblock %}
+{% block topbar_title %}Recipes{% endblock %}
+{% block topbar_meta %}Formula sheets for each product{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('recipe_new') }}" class="btn btn-primary btn-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+    New Recipe
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Recipe Sheets</h2>
+    <p>Formula records for each product type — layer composition, grade percentages, and material requirements.</p>
+  </div>
+</div>
+
+<div class="card">
+  {% if recipes %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Recipe Name</th>
+          <th>Product Type</th>
+          <th>Recipe No.</th>
+          <th>Date</th>
+          <th>Layer Ratio</th>
+          <th class="num-cell">Total (Net kg)</th>
+          <th class="actions-cell">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recipes %}
+        <tr style="cursor:pointer" onclick="window.location='{{ url_for('recipe_detail', recipe_id=r.id) }}'">
+          <td><strong style="color:var(--blue-primary)">{{ r.name }}</strong></td>
+          <td>{{ r.product_type or '—' }}</td>
+          <td class="text-muted">{{ r.recipe_no or '—' }}</td>
+          <td class="text-muted">{{ r.date | fmt_date }}</td>
+          <td>{{ r.layer_ratio or '—' }}</td>
+          <td class="num-cell"><strong>{{ '%.1f'|format(r.total_kg_net) }} kg</strong></td>
+          <td class="actions-cell" onclick="event.stopPropagation()">
+            <div class="flex gap-1">
+              <a href="{{ url_for('recipe_detail', recipe_id=r.id) }}" class="btn btn-ghost btn-sm">View</a>
+              <a href="{{ url_for('recipe_edit', recipe_id=r.id) }}" class="btn btn-outline btn-sm">Edit</a>
+              <form method="POST" action="{{ url_for('recipe_delete', recipe_id=r.id) }}" style="margin:0"
+                    onsubmit="return confirm('Delete recipe {{ r.name }}?')">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+      <path d="M12 12h.01M12 16h.01M8 12h.01M8 16h.01M16 12h.01"/>
+    </svg>
+    <h3>No Recipes Yet</h3>
+    <p>Create your first recipe sheet to define the formula for a product.</p>
+    <a href="{{ url_for('recipe_new') }}" class="btn btn-primary mt-2" style="display:inline-flex;align-items:center;gap:6px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg>
+      New Recipe
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

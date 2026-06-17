@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block topbar_title %}Users{% endblock %}
+{% block topbar_meta %}Settings — Manage user accounts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>User Accounts</h2>
+    <p>Create accounts and assign roles. If you are still using the default admin password, change it now via "Reset PW".</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">← Dashboard</a>
+  </div>
+</div>
+
+<div class="two-col-layout">
+
+  <!-- Add User -->
+  <div class="card" id="userFormCard">
+    <div class="card-header"><h3 id="formTitle">Add New User</h3></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('users_manage') }}" id="addForm">
+        <input type="hidden" name="action" value="add">
+        <div class="form-group mb-2">
+          <label for="username">Username <span class="required">*</span></label>
+          <input type="text" id="username" name="username" required autocomplete="off">
+        </div>
+        <div class="form-group mb-2">
+          <label for="password">Password <span class="required">*</span></label>
+          <input type="password" id="password" name="password" required>
+        </div>
+        <div class="form-group mb-3">
+          <label for="role">Role <span class="required">*</span></label>
+          <select id="role" name="role" required>
+            {% for key, label in roles.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <span class="form-hint">Admin = full access · Supervisor = packing + dispatch · Operator = full production control</span>
+        </div>
+        <button type="submit" class="btn btn-dark w-100">Create User</button>
+      </form>
+
+      <!-- Reset password form (hidden) -->
+      <form method="POST" action="{{ url_for('users_manage') }}" id="resetForm" style="display:none">
+        <input type="hidden" name="action" value="reset_password">
+        <input type="hidden" name="user_id" id="resetUserId">
+        <div class="form-group mb-3">
+          <label>New Password for <strong id="resetUsername"></strong></label>
+          <input type="password" name="new_password" required>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary" style="flex:1">Reset Password</button>
+          <button type="button" class="btn btn-ghost" onclick="showAddForm()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>All Users</h3>
+        <p>{{ users|length }} account(s)</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th class="text-center">Role</th>
+            <th class="text-center">Status</th>
+            <th class="actions-cell">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>
+              <strong>{{ u.username }}</strong>
+              {% if u.id == current_user.id %}<span style="font-size:.72rem;color:var(--blue-accent);margin-left:6px">(you)</span>{% endif %}
+            </td>
+            <td class="text-center">
+              {% if u.role == 'admin' %}
+                <span class="badge status-dispatched">Admin</span>
+              {% elif u.role == 'supervisor' %}
+                <span class="badge status-production">Supervisor</span>
+              {% else %}
+                <span class="badge status-open">Operator</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if u.is_active %}
+                <span class="badge status-packed">Active</span>
+              {% else %}
+                <span class="badge" style="background:var(--grey-100);color:var(--text-muted)">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="actions-cell">
+              <div class="flex gap-1" style="justify-content:flex-end">
+                <button type="button" class="btn btn-outline btn-sm"
+                        onclick="showResetForm({{ u.id }}, '{{ u.username }}')">Reset PW</button>
+                {% if u.id != current_user.id %}
+                <form method="POST" style="margin:0">
+                  <input type="hidden" name="action" value="toggle">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <button type="submit" class="btn btn-ghost btn-sm">
+                    {% if u.is_active %}Disable{% else %}Enable{% endif %}
+                  </button>
+                </form>
+                <form method="POST" style="margin:0"
+                      onsubmit="return confirm('Delete {{ u.username }}? This cannot be undone.')">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--grey-100);font-size:.8rem;color:var(--text-muted)">
+      <strong>Roles:</strong> Admin can do everything and manage users.
+      Supervisor can create packing lists and dispatch memos.
+      Operator has full control of production (add, edit, delete rolls).
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showResetForm(id, username) {
+  document.getElementById('addForm').style.display = 'none';
+  document.getElementById('resetForm').style.display = 'block';
+  document.getElementById('formTitle').textContent = 'Reset Password';
+  document.getElementById('resetUserId').value = id;
+  document.getElementById('resetUsername').textContent = username;
+}
+function showAddForm() {
+  document.getElementById('resetForm').style.display = 'none';
+  document.getElementById('addForm').style.display = 'block';
+  document.getElementById('formTitle').textContent = 'Add New User';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}" />
+  <title>{% block title %}HIC Industries{% endblock %} — HIC Industries</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18M9 21V9"/>
+        </svg>
+      </div>
+      <h1>HIC Industries</h1>
+      <p>Production Management</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+
+      <!-- Dashboard + stage filter -->
+      <a href="{{ url_for('dashboard') }}"
+         class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </a>
+      {% if request.endpoint == 'dashboard' and g.dash_counts is defined %}
+      <div class="nav-stage-filter">
+        {% set f = g.dash_filter %}
+        {% set c = g.dash_counts %}
+        <a href="{{ url_for('dashboard') }}"
+           class="nsf-item {% if f == 'all' %}nsf-active{% endif %}">
+          <span class="nsf-name">All Orders</span>
+          <span class="nsf-badge">{{ c.all }}</span>
+        </a>
+        <a href="{{ url_for('dashboard', status='open') }}"
+           class="nsf-item {% if f == 'open' %}nsf-active{% endif %}">
+          <span class="nsf-dot" style="background:#3B9EE8"></span>
+          <span class="nsf-name">Open</span>
+          <span class="nsf-badge">{{ c.open }}</span>
+        </a>
+        <a href="{{ url_for('dashboard', status='in_production') }}"
+           class="nsf-item {% if f == 'in_production' %}nsf-active{% endif %}">
+          <span class="nsf-dot" style="background:#F39C12"></span>
+          <span class="nsf-name">In Production</span>
+          <span class="nsf-badge">{{ c.in_production }}</span>
+        </a>
+        <a href="{{ url_for('dashboard', status='ready') }}"
+           class="nsf-item {% if f == 'ready' %}nsf-active{% endif %}">
+          <span class="nsf-dot" style="background:#27AE60"></span>
+          <span class="nsf-name">Ready</span>
+          <span class="nsf-badge">{{ c.ready }}</span>
+        </a>
+        <a href="{{ url_for('dashboard', status='dispatched') }}"
+           class="nsf-item {% if f == 'dispatched' %}nsf-active{% endif %}">
+          <span class="nsf-dot" style="background:#8E44AD"></span>
+          <span class="nsf-name">Dispatched</span>
+          <span class="nsf-badge">{{ c.dispatched }}</span>
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- Work Orders — admin only -->
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <a href="{{ url_for('work_order_new') }}"
+         class="nav-link {% if request.endpoint == 'work_order_new' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+        New Work Order
+      </a>
+      {% endif %}
+
+      <!-- Production — always visible, with in-production WOs listed below -->
+      <a href="{{ url_for('dashboard', status='in_production') }}"
+         class="nav-link {% if request.endpoint == 'production' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3"/>
+        </svg>
+        Production
+      </a>
+      {% if g.in_production_wos is defined and g.in_production_wos %}
+      <div class="nav-stage-filter">
+        {% for prod_wo in g.in_production_wos %}
+        <a href="{{ url_for('production', wo_id=prod_wo.id) }}"
+           class="nsf-item {% if wo is defined and wo and wo.id == prod_wo.id %}nsf-active{% endif %}">
+          <span class="nsf-dot" style="background:#F39C12"></span>
+          <span class="nsf-name" style="font-family:monospace; font-size:.8rem">{{ prod_wo.wo_number }}</span>
+          <span class="nsf-badge" style="font-size:.65rem">{{ prod_wo.roll_count }}r</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Packing Lists — supervisor + admin -->
+      {% if current_user.is_authenticated and current_user.role in ['admin','supervisor'] %}
+      <a href="{{ url_for('packing_list_index') }}"
+         class="nav-link {% if request.endpoint in ['packing_list_index','packing_list_new','packing_list_detail'] %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        Packing Lists
+      </a>
+
+      <!-- Dispatch Memos -->
+      <a href="{{ url_for('dm_index') }}"
+         class="nav-link {% if request.endpoint in ['dm_index','dm_new','dm_detail','dm_edit'] %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+        </svg>
+        Dispatch Memos
+      </a>
+      {% endif %}
+
+      <!-- Inventory — admin + supervisor -->
+      {% if current_user.is_authenticated and current_user.can('inventory') %}
+      <a href="{{ url_for('inventory_index') }}"
+         class="nav-link {% if request.endpoint in ['inventory_index','inventory_add_stock','inventory_ledger'] %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 7l-8-4-8 4m16 0v10l-8 4m0-14L4 17m8-14v14"/>
+        </svg>
+        Inventory
+      </a>
+      {% endif %}
+
+      <!-- Current WO context (only when inside a WO page) -->
+      {% if wo is defined and wo %}
+      <div class="nav-section-label mt-2">WO: {{ wo.wo_number }}</div>
+      <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}"
+         class="nav-link {% if request.endpoint == 'work_order_detail' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+        </svg>
+        Work Order
+      </a>
+      <a href="{{ url_for('production', wo_id=wo.id) }}"
+         class="nav-link {% if request.endpoint == 'production' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3"/>
+        </svg>
+        Production Log
+      </a>
+      {% endif %}
+
+      {% if current_user.is_authenticated and current_user.role == 'admin' %}
+      <div class="nav-section-label mt-2">Admin</div>
+      <a href="{{ url_for('recipe_index') }}"
+         class="nav-link {% if request.endpoint in ['recipe_index','recipe_new','recipe_detail','recipe_edit'] %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/>
+          <path d="M9 12h6M9 16h4"/>
+        </svg>
+        Recipes
+      </a>
+      <a href="{{ url_for('customers_manage') }}"
+         class="nav-link {% if request.endpoint == 'customers_manage' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        Customers
+      </a>
+      <a href="{{ url_for('product_types_manage') }}"
+         class="nav-link {% if request.endpoint == 'product_types_manage' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        Product Types
+      </a>
+      <a href="{{ url_for('users_manage') }}"
+         class="nav-link {% if request.endpoint == 'users_manage' %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+        Users
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      {% if current_user.is_authenticated %}
+      <div style="margin-bottom:6px;font-weight:600;font-size:.8rem">
+        {{ current_user.username }}
+        <span style="opacity:.6;font-weight:400;font-size:.72rem">({{ current_user.role_label }})</span>
+      </div>
+      <a href="{{ url_for('logout') }}" style="color:rgba(255,255,255,.5);font-size:.75rem;text-decoration:none">Sign out</a>
+      <br>
+      {% endif %}
+      HIC Industries v1.0
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-wrapper">
+    <!-- Sidebar overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <header class="topbar">
+      <!-- Hamburger — only visible on small screens via CSS -->
+      <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()" aria-label="Menu" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <div>
+        <div class="topbar-title">{% block topbar_title %}HIC Industries{% endblock %}</div>
+        <div class="topbar-meta">{% block topbar_meta %}Plastic Film Production Management{% endblock %}</div>
+      </div>
+      <div class="topbar-spacer"></div>
+      {% if wo is defined and wo %}
+      <div class="topbar-wo-badge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+        </svg>
+        {{ wo.wo_number }} — {{ wo.customer_name }}
+        <span class="badge {{ wo.status_css }}" style="margin-left:4px">{{ wo.status_label }}</span>
+      </div>
+      {% endif %}
+      {% block topbar_actions %}{% endblock %}
+      {% if current_user.is_authenticated %}
+      <div class="topbar-user">
+        <span class="topbar-username">
+          {{ current_user.username }}
+          <span class="topbar-role">{{ current_user.role_label }}</span>
+        </span>
+        <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm topbar-signout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign Out
+        </a>
+      </div>
+      {% endif %}
+    </header>
+
+    <div class="flash-container" id="flashContainer">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+          <span>{{ message }}</span>
+          <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+        </div>
+        {% endfor %}
+      {% endwith %}
+    </div>
+
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+  // ── CSRF: inject the session token into every POST form so all existing
+  //    forms are protected without editing each one individually. ───────────
+  (function () {
+    const token = document.querySelector('meta[name="csrf-token"]');
+    const tokenVal = token ? token.getAttribute('content') : '';
+    function addTokenToForms() {
+      document.querySelectorAll('form').forEach(form => {
+        const method = (form.getAttribute('method') || 'get').toLowerCase();
+        if (method !== 'post') return;
+        if (form.querySelector('input[name="_csrf_token"]')) return;
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = '_csrf_token';
+        input.value = tokenVal;
+        form.appendChild(input);
+      });
+    }
+    addTokenToForms();
+    // Re-run when forms are revealed/added dynamically (e.g. edit rows, modals).
+    document.addEventListener('submit', addTokenToForms, true);
+
+    // Also attach the token to same-origin fetch() POST/DELETE calls used by the app.
+    const _fetch = window.fetch;
+    window.fetch = function (input, init) {
+      init = init || {};
+      const method = (init.method || 'GET').toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD') {
+        init.headers = Object.assign({}, init.headers, { 'X-CSRFToken': tokenVal });
+      }
+      return _fetch(input, init);
+    };
+  })();
+  </script>
+  {% block scripts %}{% endblock %}
+  <script>
+  // ── Hamburger / sidebar toggle ─────────────────────────────────────────────
+  const sidebar        = document.querySelector('.sidebar');
+  const overlay        = document.getElementById('sidebarOverlay');
+  const hamburgerBtn   = document.getElementById('hamburgerBtn');
+
+  function isMobile() { return window.innerWidth <= 900; }
+
+  function showHamburger() {
+    if (hamburgerBtn) hamburgerBtn.style.display = isMobile() ? 'flex' : 'none';
+  }
+
+  function toggleSidebar() {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  }
+
+  showHamburger();
+  window.addEventListener('resize', () => {
+    showHamburger();
+    if (!isMobile()) closeSidebar();
+  });
+
+  // Close sidebar when a nav link is clicked (mobile UX)
+  document.querySelectorAll('.nav-link, .nsf-item').forEach(link => {
+    link.addEventListener('click', () => { if (isMobile()) closeSidebar(); });
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Add Stock{% endblock %}
+{% block topbar_title %}Add Stock{% endblock %}
+{% block topbar_meta %}Incoming raw material{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Add Incoming Stock</h2>
+    <p>Enter quantities for any grades that arrived. Leave blank to skip a grade.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('inventory_index') }}" class="btn btn-ghost">← Inventory</a>
+  </div>
+</div>
+
+<div class="two-col-layout">
+
+  <!-- Add new grade to master list -->
+  <div class="card">
+    <div class="card-header"><h3>Add New Grade</h3></div>
+    <div class="card-body">
+      <form method="POST">
+        <input type="hidden" name="action" value="add_material">
+        <div class="form-group mb-2">
+          <label>Grade Name <span class="required">*</span></label>
+          <input type="text" name="mat_name" required placeholder="e.g. F19010, HD46003" autocomplete="off">
+          <span class="form-hint">Exact name as used in recipes</span>
+        </div>
+        <div class="form-group mb-3">
+          <label>Description</label>
+          <input type="text" name="mat_desc" placeholder="Optional description">
+        </div>
+        <button type="submit" class="btn btn-dark w-100">Add Grade to Master List</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Stock entry form -->
+  <div class="card">
+    <div class="card-header"><h3>Enter Incoming Quantities</h3></div>
+    {% if materials %}
+    <form method="POST">
+      <input type="hidden" name="action" value="add_stock">
+      <div class="form-group mb-2" style="padding:16px 20px 0">
+        <label>Reference / Invoice No.</label>
+        <input type="text" name="reference" placeholder="e.g. INV-2024-001" autocomplete="off">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Grade</th>
+              <th class="num-cell" style="width:150px">Qty Received (kg)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for mat in materials %}
+            <tr>
+              <td>
+                <strong>{{ mat.name }}</strong>
+                {% if mat.description %}<div style="font-size:.75rem;color:var(--text-muted)">{{ mat.description }}</div>{% endif %}
+              </td>
+              <td class="num-cell">
+                <input type="number" name="qty_{{ mat.id }}" step="0.001" min="0"
+                       placeholder="0.000" style="width:120px;text-align:right;padding:6px 8px">
+              </td>
+              <td>
+                <input type="text" name="notes_{{ mat.id }}" placeholder="Optional note"
+                       style="font-size:.82rem;padding:6px 8px">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:16px 20px">
+        <button type="submit" class="btn btn-primary w-100">Save Incoming Stock</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="empty-state">
+      <h3>No Grades Yet</h3>
+      <p>Add grades using the form on the left, or create recipes — grades are added automatically.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

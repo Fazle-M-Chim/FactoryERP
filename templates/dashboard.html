@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+{% block topbar_meta %}
+  {% if active_filter == 'all' %}All Work Orders
+  {% elif active_filter == 'open' %}Open Orders
+  {% elif active_filter == 'in_production' %}In Production
+  {% elif active_filter == 'ready' %}Ready
+  {% elif active_filter == 'dispatched' %}Dispatched
+  {% endif %}
+{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('work_order_new') }}" class="btn btn-primary btn-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+    New Work Order
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats Row -->
+<div class="stats-row">
+  <div class="stat-card accent">
+    <div class="stat-value">{{ counts.all }}</div>
+    <div class="stat-label">Total Orders</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--info)">{{ counts.open }}</div>
+    <div class="stat-label">Open</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:var(--warning)">{{ counts.in_production }}</div>
+    <div class="stat-label">In Production</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:#2E7D32">{{ counts.ready }}</div>
+    <div class="stat-label">Ready</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="color:#5E35B1">{{ counts.dispatched }}</div>
+    <div class="stat-label">Dispatched</div>
+  </div>
+</div>
+
+<!-- Work Orders table — full width -->
+<div class="card">
+    <div class="card-header">
+      <div>
+        <h2>{% if active_filter == 'all' %}All Work Orders
+            {% elif active_filter == 'open' %}Open Orders
+            {% elif active_filter == 'in_production' %}In Production
+            {% elif active_filter == 'ready' %}Ready
+            {% elif active_filter == 'dispatched' %}Dispatched
+{% endif %}</h2>
+        <p>Click any row to view details</p>
+      </div>
+    </div>
+
+    {% if work_orders %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>WO No.</th>
+            <th>Customer</th>
+            <th>Product</th>
+            <th class="num-cell">Size</th>
+            <th class="num-cell">Thick.</th>
+            <th class="num-cell">Order Qty</th>
+            <th>Progress</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th class="actions-cell">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for wo in work_orders %}
+          <tr style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <td><span style="font-weight:700; color:var(--blue-primary)">{{ wo.wo_number }}</span></td>
+            <td>{{ wo.customer_name }}</td>
+            <td>{{ wo.product_type }}</td>
+            <td class="num-cell">{{ wo.size_mm | int }} mm</td>
+            <td class="num-cell">{{ wo.thickness_microns | int }} µ</td>
+            <td class="num-cell">{{ wo.total_weight_kg | int }} kg</td>
+            <td style="min-width:130px">
+              <div class="progress-wrap">
+                <div class="progress-bar-outer">
+                  <div class="progress-bar-inner {% if wo.progress_pct >= 100 %}full{% endif %}"
+                       style="width: {{ wo.progress_pct }}%"></div>
+                </div>
+                <span class="progress-pct">{{ wo.progress_pct }}%</span>
+              </div>
+              <div style="font-size:.72rem; color:var(--text-muted); margin-top:2px">
+                {{ '%.1f'|format(wo.total_produced_kg) }} / {{ wo.total_weight_kg | int }} kg ({{ wo.roll_count }} rolls)
+              </div>
+            </td>
+            <td><span class="badge {{ wo.status_css }}">{{ wo.status_label }}</span></td>
+            <td><span class="text-muted">{{ wo.created_at | ist | truncate(10, True, '') }}</span></td>
+            <td class="actions-cell" onclick="event.stopPropagation()">
+              <div class="flex gap-1">
+                <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}" class="btn btn-ghost btn-sm">View</a>
+                {% if wo.status == 'open' %}<a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Start</a>
+                {% elif wo.status == 'in_production' %}<a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Rolls</a>
+                {% elif wo.status == 'ready' %}<a href="{{ url_for('packing_list_index') }}" class="btn btn-outline btn-sm">Pack</a>
+                {% elif wo.status == 'dispatched' %}<a href="{{ url_for('dm_index') }}" class="btn btn-outline btn-sm">DM</a>
+                {% else %}<a href="{{ url_for('dm_index') }}" class="btn btn-outline btn-sm">DM</a>{% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+      </svg>
+      <h3>No Work Orders Found</h3>
+      <p>{% if active_filter != 'all' %}No orders at this stage.{% else %}Create your first work order to get started.{% endif %}</p>
+      {% if active_filter == 'all' %}
+      <a href="{{ url_for('work_order_new') }}" class="btn btn-primary mt-2" style="display:inline-flex;align-items:center;gap:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg>
+        New Work Order
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+{% endblock %}

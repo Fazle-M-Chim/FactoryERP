@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+{% block title %}Production — {{ wo.wo_number }}{% endblock %}
+{% block topbar_title %}Production{% endblock %}
+{% block topbar_meta %}{{ wo.wo_number }} — Log Rolls{% endblock %}
+
+{% block content %}
+
+<div class="steps-bar">
+  <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}" class="step-item done">
+    <div class="step-num">✓</div>
+    <div class="step-info"><div class="step-label">Work Order</div><div class="step-sublabel">{{ wo.wo_number }}</div></div>
+  </a>
+  <div class="step-connector"></div>
+  <a href="{{ url_for('production', wo_id=wo.id) }}" class="step-item active">
+    <div class="step-num">2</div>
+    <div class="step-info"><div class="step-label">Production</div><div class="step-sublabel">Log rolls</div></div>
+  </a>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">3</div>
+    <div class="step-info"><div class="step-label">Packing List</div><div class="step-sublabel">Multi-WO</div></div>
+  </div>
+  <div class="step-connector"></div>
+  <div class="step-item">
+    <div class="step-num">4</div>
+    <div class="step-info"><div class="step-label">Dispatch (DM)</div><div class="step-sublabel">Material challan</div></div>
+  </div>
+</div>
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Production Log</h2>
+    <p>{{ wo.customer_name }} &nbsp;·&nbsp; {{ wo.product_type }} &nbsp;·&nbsp; {{ wo.size_mm|int }} mm × {{ wo.thickness_microns|int }} µ</p>
+  </div>
+  <div class="page-header-actions">
+    {% if wo.rolls and wo.status not in ['ready','dispatched'] %}
+    <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}">
+      <input type="hidden" name="action" value="mark_ready">
+      <button type="submit" class="btn btn-primary">Mark as Ready →</button>
+    </form>
+    {% elif wo.status == 'ready' %}
+    <span class="badge status-packed" style="padding:7px 14px;font-size:.85rem">Ready for Packing</span>
+    <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" style="margin-left:8px">
+      <input type="hidden" name="action" value="mark_in_production">
+      <button type="submit" class="btn btn-ghost btn-sm">↩ Back to In Production</button>
+    </form>
+    {% elif wo.status == 'dispatched' %}
+    <span class="badge status-dispatched" style="padding:7px 14px;font-size:.85rem">Dispatched</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══ OVERALL PROGRESS BAR ════════════════════════════════════════════════ -->
+<div class="card mb-3">
+  <div class="card-body" style="padding:14px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span style="font-size:.85rem;color:var(--text-muted)">Overall Progress</span>
+      <span style="font-size:.9rem;font-weight:700;color:var(--blue-primary)">
+        {{ '%.2f'|format(wo.total_produced_kg) }} / {{ wo.total_weight_kg|int }} kg
+        &nbsp;({{ wo.roll_count }} rolls · {{ wo.progress_pct }}%)
+      </span>
+    </div>
+    <div class="progress-bar-outer" style="height:10px">
+      <div class="progress-bar-inner {% if wo.progress_pct >= 100 %}full{% endif %}"
+           style="width:{{ wo.progress_pct }}%;height:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TWO-MACHINE PANELS ══════════════════════════════════════════════════ -->
+<div class="prod-split-layout">
+
+  {# ── RAJU panel ─────────────────────────────────────────────────────── #}
+  <div class="prod-machine-panel">
+
+    <!-- Panel header -->
+    <div class="prod-panel-header prod-panel-raju">
+      <div class="prod-panel-title">
+        <span class="prod-panel-icon">R</span>
+        <div>
+          <div class="prod-panel-name">Raju</div>
+          <div class="prod-panel-sub">Side A &amp; Side B</div>
+        </div>
+      </div>
+      <div class="prod-panel-stats">
+        {% set raju_rolls = rolls | selectattr('machine', 'in', ['RA','RB']) | list %}
+        {% set raju_net = raju_rolls | sum(attribute='net_weight_kg') %}
+        <span>{{ raju_rolls|length }} rolls</span>
+        <span style="font-weight:700">{{ '%.2f'|format(raju_net) }} kg</span>
+      </div>
+    </div>
+
+    <!-- Add Roll form — Raju -->
+    <div class="prod-add-form">
+      <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" id="rajuForm">
+        <input type="hidden" name="action" value="add_roll">
+
+        <!-- Side selector: A or B -->
+        <div class="form-group mb-2">
+          <label style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Side</label>
+          <div class="side-selector">
+            <label class="side-option" for="raju_side_a" data-machine="RA">
+              <input type="radio" name="machine" id="raju_side_a" value="RA" checked>
+              <span class="side-btn side-btn-raju-a">Side A <span style="font-size:.72rem;opacity:.75">(RA)</span></span>
+            </label>
+            <label class="side-option" for="raju_side_b" data-machine="RB">
+              <input type="radio" name="machine" id="raju_side_b" value="RB">
+              <span class="side-btn side-btn-raju-b">Side B <span style="font-size:.72rem;opacity:.75">(RB)</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group mb-2">
+          <label for="raju_roll_no" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">
+            Roll Number <span class="required">*</span>
+            <span style="font-weight:400;font-size:.7rem;margin-left:4px">(auto-filled)</span>
+          </label>
+          <input type="text" id="raju_roll_no" name="roll_no" required
+                 placeholder="Loading…" autocomplete="off"
+                 class="prod-roll-input">
+        </div>
+
+        <div class="form-grid form-grid-2 mb-2">
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Size (mm)</label>
+            <input type="number" name="size_mm" value="{{ wo.size_mm|int }}" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Thickness (µ)</label>
+            <input type="number" name="thickness_microns" value="{{ wo.thickness_microns|int }}" step="0.5" required>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-group mb-2">
+          <label style="font-size:.75rem;color:var(--text-muted)">Production Weight (kg)</label>
+          <input type="number" name="production_weight_kg" step="0.001" placeholder="Core + film">
+        </div>
+
+        <div class="form-grid form-grid-2 mb-2">
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Gross Wt (kg) <span class="required">*</span></label>
+            <input type="number" name="gross_weight_kg" step="0.001" required placeholder="Inc. packaging"
+                   class="gross-input" data-form="raju">
+          </div>
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Core Wt (kg) <span class="required">*</span></label>
+            <input type="number" name="core_weight_kg" step="0.001" required placeholder="e.g. 1.5"
+                   class="core-input" data-form="raju">
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label style="font-size:.75rem;color:var(--text-muted)">Net Weight (kg)</label>
+          <input type="number" class="calculated net-display" data-form="raju" readonly placeholder="Auto-calculated">
+        </div>
+
+        <button type="submit" class="btn btn-dark w-100">Add Raju Roll</button>
+      </form>
+    </div>
+
+    <!-- Raju roll history -->
+    <div class="prod-history">
+      {% set raju_rolls = rolls | selectattr('machine', 'in', ['RA','RB']) | list %}
+      {% if raju_rolls %}
+      <div class="prod-history-header">
+        <span style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">
+          History ({{ raju_rolls|length }} rolls)
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Roll No.</th>
+              <th class="text-center" style="width:46px">Side</th>
+              <th class="num-cell">Gross</th>
+              <th class="num-cell">Core</th>
+              <th class="num-cell">Net (kg)</th>
+              <th class="actions-cell">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for roll in raju_rolls %}
+            <tr id="view-{{ roll.id }}">
+              <td><strong>{{ roll.roll_no }}</strong></td>
+              <td class="text-center">
+                <span class="machine-tag machine-{{ roll.machine|lower }}">{{ roll.machine }}</span>
+              </td>
+              <td class="num-cell">{{ '%.3f'|format(roll.gross_weight_kg) }}</td>
+              <td class="num-cell">{{ '%.3f'|format(roll.core_weight_kg) }}</td>
+              <td class="num-cell net-cell" style="font-weight:600;color:var(--blue-primary)">{{ '%.3f'|format(roll.net_weight_kg) }}</td>
+              <td class="actions-cell">
+                <div class="flex gap-1">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="openEdit({{ roll.id }})">Edit</button>
+                  <form method="POST" action="{{ url_for('roll_delete', roll_id=roll.id) }}" style="margin:0">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Remove roll {{ roll.roll_no }}?')">Remove</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <!-- Inline edit row -->
+            <tr id="edit-{{ roll.id }}" style="display:none;background:#F0F7FF">
+              <td colspan="6" style="padding:10px 14px">
+                <form method="POST" action="{{ url_for('roll_edit', roll_id=roll.id) }}" class="edit-roll-form">
+                  <div class="roll-edit-grid">
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Roll No.</label>
+                      <input type="text" name="roll_no" value="{{ roll.roll_no }}" required style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Size (mm)</label>
+                      <input type="number" name="size_mm" value="{{ roll.size_mm }}" step="0.1" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Thick. (µ)</label>
+                      <input type="number" name="thickness_microns" value="{{ roll.thickness_microns }}" step="0.5" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Prod. Wt</label>
+                      <input type="number" name="production_weight_kg" value="{{ roll.production_weight_kg }}" step="0.001" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Gross (kg)</label>
+                      <input type="number" name="gross_weight_kg" value="{{ roll.gross_weight_kg }}" step="0.001" required
+                             class="edit-gross" data-id="{{ roll.id }}" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Core (kg)</label>
+                      <input type="number" name="core_weight_kg" value="{{ roll.core_weight_kg }}" step="0.001" required
+                             class="edit-core" data-id="{{ roll.id }}" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Net (kg)</label>
+                      <input type="number" class="edit-net calculated" data-id="{{ roll.id }}"
+                             value="{{ roll.net_weight_kg }}" readonly style="padding:5px 8px;font-size:.82rem;background:var(--grey-50)">
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px">
+                      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                      <button type="button" class="btn btn-ghost btn-sm" onclick="closeEdit({{ roll.id }})">×</button>
+                    </div>
+                  </div>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align:right;font-size:.75rem;color:var(--text-muted);padding:8px 14px">Raju total</td>
+              <td class="num-cell" style="font-weight:700;color:var(--blue-primary);padding:8px 14px">
+                {{ '%.3f'|format(raju_rolls|sum(attribute='net_weight_kg')) }} kg
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:24px 16px;color:var(--text-muted);font-size:.85rem">
+        No Raju rolls yet — add one above.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── SHUBHAM panel ───────────────────────────────────────────────────── #}
+  <div class="prod-machine-panel">
+
+    <!-- Panel header -->
+    <div class="prod-panel-header prod-panel-shubham">
+      <div class="prod-panel-title">
+        <span class="prod-panel-icon">S</span>
+        <div>
+          <div class="prod-panel-name">Shubham</div>
+          <div class="prod-panel-sub">Side A &amp; Side B</div>
+        </div>
+      </div>
+      <div class="prod-panel-stats">
+        {% set shubham_rolls = rolls | selectattr('machine', 'in', ['SA','SB']) | list %}
+        {% set shubham_net = shubham_rolls | sum(attribute='net_weight_kg') %}
+        <span>{{ shubham_rolls|length }} rolls</span>
+        <span style="font-weight:700">{{ '%.2f'|format(shubham_net) }} kg</span>
+      </div>
+    </div>
+
+    <!-- Add Roll form — Shubham -->
+    <div class="prod-add-form">
+      <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" id="shubhamForm">
+        <input type="hidden" name="action" value="add_roll">
+
+        <div class="form-group mb-2">
+          <label style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">Side</label>
+          <div class="side-selector">
+            <label class="side-option" for="shubham_side_a" data-machine="SA">
+              <input type="radio" name="machine" id="shubham_side_a" value="SA" checked>
+              <span class="side-btn side-btn-shubham-a">Side A <span style="font-size:.72rem;opacity:.75">(SA)</span></span>
+            </label>
+            <label class="side-option" for="shubham_side_b" data-machine="SB">
+              <input type="radio" name="machine" id="shubham_side_b" value="SB">
+              <span class="side-btn side-btn-shubham-b">Side B <span style="font-size:.72rem;opacity:.75">(SB)</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group mb-2">
+          <label for="shubham_roll_no" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)">
+            Roll Number <span class="required">*</span>
+            <span style="font-weight:400;font-size:.7rem;margin-left:4px">(auto-filled)</span>
+          </label>
+          <input type="text" id="shubham_roll_no" name="roll_no" required
+                 placeholder="Loading…" autocomplete="off"
+                 class="prod-roll-input">
+        </div>
+
+        <div class="form-grid form-grid-2 mb-2">
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Size (mm)</label>
+            <input type="number" name="size_mm" value="{{ wo.size_mm|int }}" step="0.1" required>
+          </div>
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Thickness (µ)</label>
+            <input type="number" name="thickness_microns" value="{{ wo.thickness_microns|int }}" step="0.5" required>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-group mb-2">
+          <label style="font-size:.75rem;color:var(--text-muted)">Production Weight (kg)</label>
+          <input type="number" name="production_weight_kg" step="0.001" placeholder="Core + film">
+        </div>
+
+        <div class="form-grid form-grid-2 mb-2">
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Gross Wt (kg) <span class="required">*</span></label>
+            <input type="number" name="gross_weight_kg" step="0.001" required placeholder="Inc. packaging"
+                   class="gross-input" data-form="shubham">
+          </div>
+          <div class="form-group">
+            <label style="font-size:.75rem;color:var(--text-muted)">Core Wt (kg) <span class="required">*</span></label>
+            <input type="number" name="core_weight_kg" step="0.001" required placeholder="e.g. 1.5"
+                   class="core-input" data-form="shubham">
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label style="font-size:.75rem;color:var(--text-muted)">Net Weight (kg)</label>
+          <input type="number" class="calculated net-display" data-form="shubham" readonly placeholder="Auto-calculated">
+        </div>
+
+        <button type="submit" class="btn btn-dark w-100">Add Shubham Roll</button>
+      </form>
+    </div>
+
+    <!-- Shubham roll history -->
+    <div class="prod-history">
+      {% set shubham_rolls = rolls | selectattr('machine', 'in', ['SA','SB']) | list %}
+      {% if shubham_rolls %}
+      <div class="prod-history-header">
+        <span style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">
+          History ({{ shubham_rolls|length }} rolls)
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Roll No.</th>
+              <th class="text-center" style="width:46px">Side</th>
+              <th class="num-cell">Gross</th>
+              <th class="num-cell">Core</th>
+              <th class="num-cell">Net (kg)</th>
+              <th class="actions-cell">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for roll in shubham_rolls %}
+            <tr id="view-{{ roll.id }}">
+              <td><strong>{{ roll.roll_no }}</strong></td>
+              <td class="text-center">
+                <span class="machine-tag machine-{{ roll.machine|lower }}">{{ roll.machine }}</span>
+              </td>
+              <td class="num-cell">{{ '%.3f'|format(roll.gross_weight_kg) }}</td>
+              <td class="num-cell">{{ '%.3f'|format(roll.core_weight_kg) }}</td>
+              <td class="num-cell net-cell" style="font-weight:600;color:var(--blue-primary)">{{ '%.3f'|format(roll.net_weight_kg) }}</td>
+              <td class="actions-cell">
+                <div class="flex gap-1">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="openEdit({{ roll.id }})">Edit</button>
+                  <form method="POST" action="{{ url_for('roll_delete', roll_id=roll.id) }}" style="margin:0">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Remove roll {{ roll.roll_no }}?')">Remove</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <!-- Inline edit row -->
+            <tr id="edit-{{ roll.id }}" style="display:none;background:#F5F3FF">
+              <td colspan="6" style="padding:10px 14px">
+                <form method="POST" action="{{ url_for('roll_edit', roll_id=roll.id) }}" class="edit-roll-form">
+                  <div class="roll-edit-grid">
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Roll No.</label>
+                      <input type="text" name="roll_no" value="{{ roll.roll_no }}" required style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Size (mm)</label>
+                      <input type="number" name="size_mm" value="{{ roll.size_mm }}" step="0.1" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Thick. (µ)</label>
+                      <input type="number" name="thickness_microns" value="{{ roll.thickness_microns }}" step="0.5" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Prod. Wt</label>
+                      <input type="number" name="production_weight_kg" value="{{ roll.production_weight_kg }}" step="0.001" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Gross (kg)</label>
+                      <input type="number" name="gross_weight_kg" value="{{ roll.gross_weight_kg }}" step="0.001" required
+                             class="edit-gross" data-id="{{ roll.id }}" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Core (kg)</label>
+                      <input type="number" name="core_weight_kg" value="{{ roll.core_weight_kg }}" step="0.001" required
+                             class="edit-core" data-id="{{ roll.id }}" style="padding:5px 8px;font-size:.82rem">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                      <label style="font-size:.7rem">Net (kg)</label>
+                      <input type="number" class="edit-net calculated" data-id="{{ roll.id }}"
+                             value="{{ roll.net_weight_kg }}" readonly style="padding:5px 8px;font-size:.82rem;background:var(--grey-50)">
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px">
+                      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                      <button type="button" class="btn btn-ghost btn-sm" onclick="closeEdit({{ roll.id }})">×</button>
+                    </div>
+                  </div>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align:right;font-size:.75rem;color:var(--text-muted);padding:8px 14px">Shubham total</td>
+              <td class="num-cell" style="font-weight:700;color:var(--blue-primary);padding:8px 14px">
+                {{ '%.3f'|format(shubham_rolls|sum(attribute='net_weight_kg')) }} kg
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:24px 16px;color:var(--text-muted);font-size:.85rem">
+        No Shubham rolls yet — add one above.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div><!-- /.prod-split-layout -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Net weight calc for each add-form ──────────────────────────────────────
+document.querySelectorAll('.gross-input, .core-input').forEach(input => {
+  input.addEventListener('input', function () {
+    const form = this.dataset.form;
+    const gross = parseFloat(document.querySelector(`.gross-input[data-form="${form}"]`).value) || 0;
+    const core  = parseFloat(document.querySelector(`.core-input[data-form="${form}"]`).value)  || 0;
+    const net   = document.querySelector(`.net-display[data-form="${form}"]`);
+    if (net) net.value = (gross - core) > 0 ? (gross - core).toFixed(3) : '';
+  });
+});
+
+// ── Net weight calc for inline edit rows ───────────────────────────────────
+document.querySelectorAll('.edit-gross, .edit-core').forEach(input => {
+  input.addEventListener('input', function () {
+    const id = this.dataset.id;
+    const g  = parseFloat(document.querySelector(`.edit-gross[data-id="${id}"]`).value) || 0;
+    const c  = parseFloat(document.querySelector(`.edit-core[data-id="${id}"]`).value)  || 0;
+    const n  = document.querySelector(`.edit-net[data-id="${id}"]`);
+    if (n) n.value = (g - c) > 0 ? (g - c).toFixed(3) : '';
+  });
+});
+
+// ── Show/hide inline edit row ──────────────────────────────────────────────
+function openEdit(id) {
+  document.querySelectorAll('tr[id^="edit-"]').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('tr[id^="view-"]').forEach(r => r.style.opacity = '1');
+  document.getElementById('view-' + id).style.opacity = '0.4';
+  const editRow = document.getElementById('edit-' + id);
+  editRow.style.display = '';
+  editRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function closeEdit(id) {
+  document.getElementById('edit-' + id).style.display = 'none';
+  document.getElementById('view-' + id).style.opacity = '1';
+}
+
+// ── Auto-fill roll number when side radio changes ──────────────────────────
+function fetchNextRoll(machine, inputEl) {
+  if (!inputEl) return;
+  inputEl.placeholder = 'Loading…';
+  fetch(`/api/next-roll-number?machine=${machine}`)
+    .then(r => r.json())
+    .then(data => { inputEl.value = data.roll_number; inputEl.placeholder = ''; })
+    .catch(() => { inputEl.placeholder = `e.g. ${machine}2000`; });
+}
+
+// Raju radios
+document.querySelectorAll('#rajuForm input[name="machine"]').forEach(radio => {
+  radio.addEventListener('change', function () {
+    if (this.checked) fetchNextRoll(this.value, document.getElementById('raju_roll_no'));
+  });
+});
+
+// Shubham radios
+document.querySelectorAll('#shubhamForm input[name="machine"]').forEach(radio => {
+  radio.addEventListener('change', function () {
+    if (this.checked) fetchNextRoll(this.value, document.getElementById('shubham_roll_no'));
+  });
+});
+
+// Initial fetch on page load for both panels
+const rajuChecked   = document.querySelector('#rajuForm input[name="machine"]:checked');
+const shubhamChecked = document.querySelector('#shubhamForm input[name="machine"]:checked');
+if (rajuChecked)   fetchNextRoll(rajuChecked.value,   document.getElementById('raju_roll_no'));
+if (shubhamChecked) fetchNextRoll(shubhamChecked.value, document.getElementById('shubham_roll_no'));
+</script>
+{% endblock %}

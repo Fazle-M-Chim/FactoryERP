@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}New Dispatch Memo{% endblock %}
+{% block topbar_title %}New Dispatch Memo{% endblock %}
+{% block topbar_meta %}Create a delivery memo for a packing list{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Create Dispatch Memo</h2>
+    <p>Select a packing list and fill in the transport details.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('dm_index') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+
+{% if undispatched_pls %}
+<form method="POST" action="{{ url_for('dm_new') }}">
+<div class="two-col-layout-wide">
+
+  <div>
+    <!-- Packing list selector -->
+    <div class="card mb-3">
+      <div class="card-header"><h3>Select Packing List</h3></div>
+      <div class="card-body">
+        <div class="form-group mb-3">
+          <label for="packing_list_id">Packing List <span class="required">*</span></label>
+          <select id="packing_list_id" name="packing_list_id" required onchange="loadPLInfo(this.value)">
+            <option value="">— Select packing list —</option>
+            {% for pl in undispatched_pls %}
+            <option value="{{ pl.id }}"
+              {% if preselect_pl and preselect_pl.id == pl.id %}selected{% endif %}>
+              {{ pl.pl_number }} &nbsp;({{ pl.work_orders|length }} WO{{ 's' if pl.work_orders|length != 1 else '' }}, {{ pl.total_rolls }} rolls)
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <!-- PL summary shown after selection -->
+        <div id="plSummary" style="display:none" class="pl-info-box">
+          <div class="pl-info-row"><span>Work Orders:</span><strong id="plWOs"></strong></div>
+          <div class="pl-info-row"><span>Total Rolls:</span><strong id="plRolls"></strong></div>
+          <div class="pl-info-row"><span>Net Weight:</span><strong id="plNet"></strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transport details -->
+    <div class="card">
+      <div class="card-header"><h3>Transport Details</h3></div>
+      <div class="card-body">
+        <div class="form-group mb-2">
+          <label for="dm_number">DM Number <span class="required">*</span></label>
+          <input type="text" id="dm_number" name="dm_number"
+                 placeholder="e.g. 5410" required autocomplete="off"
+                 style="font-size:1.1rem; font-weight:700; letter-spacing:.02em">
+          <span class="form-hint">Enter the DM number from your records.</span>
+        </div>
+        <div class="form-group mb-2">
+          <label for="dispatch_date">Dispatch Date <span class="required">*</span></label>
+          <input type="date" id="dispatch_date" name="dispatch_date" value="{{ today }}" required>
+        </div>
+        <div class="form-group mb-2">
+          <label for="vehicle_number">Vehicle / Truck Number</label>
+          <input type="text" id="vehicle_number" name="vehicle_number" placeholder="e.g. MH-31-CB-1234">
+        </div>
+        <div class="form-group mb-2">
+          <label for="customer_name">Customer Name (for DM)</label>
+          <input type="text" id="customer_name" name="customer_name" placeholder="Auto-filled from packing list">
+        </div>
+        <div class="form-group mb-3">
+          <label for="customer_address">Delivery Address</label>
+          <textarea id="customer_address" name="customer_address" placeholder="Auto-filled from customer record" style="min-height:70px"></textarea>
+        </div>
+        <button type="submit" class="btn btn-dark w-100">Generate Dispatch Memo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: preview of what's in the selected PL -->
+  <div class="card" id="plPreviewCard" style="{% if not preselect_pl %}display:none{% endif %}">
+    <div class="card-header"><h3>Packing List Contents</h3></div>
+    <div id="plPreviewBody" class="card-body" style="font-size:.85rem">
+      {% if preselect_pl %}
+      {% for wo in preselect_pl.work_orders %}
+      <div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--grey-100)">
+        <strong>{{ wo.wo_number }}</strong> — {{ wo.customer_name }}<br>
+        <span class="text-muted">{{ wo.product_type }}, {{ wo.size_mm|int }}mm × {{ wo.thickness_microns|int }}µ, {{ wo.roll_count }} rolls, {{ '%.2f'|format(wo.total_produced_kg) }} kg</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+</form>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <h3>No Packing Lists Ready for Dispatch</h3>
+    <p>All existing packing lists already have a Dispatch Memo, or no packing lists have been created yet.</p>
+    <a href="{{ url_for('packing_list_new') }}" class="btn btn-outline mt-2">Create Packing List →</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadPLInfo(plId) {
+  if (!plId) {
+    document.getElementById('plSummary').style.display = 'none';
+    document.getElementById('plPreviewCard').style.display = 'none';
+    return;
+  }
+  fetch(`/api/packing-list-info/${plId}`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('plWOs').textContent = d.wo_numbers.join(', ');
+      document.getElementById('plRolls').textContent = d.total_rolls;
+      document.getElementById('plNet').textContent = d.total_net_kg.toFixed(3) + ' kg';
+      document.getElementById('plSummary').style.display = 'block';
+      if (d.customer_name) document.getElementById('customer_name').value = d.customer_name;
+      if (d.customer_address) document.getElementById('customer_address').value = d.customer_address;
+    });
+
+  // Load full preview via simple fetch of the PL detail page data
+  fetch(`/api/packing-list-info/${plId}`)
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('plPreviewCard').style.display = 'block';
+    });
+}
+// Auto-load if pre-selected
+const sel = document.getElementById('packing_list_id');
+if (sel && sel.value) loadPLInfo(sel.value);
+</script>
+{% endblock %}

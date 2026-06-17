@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}DM {{ dm.dm_number }}{% endblock %}
+{% block topbar_title %}Dispatch Memo {{ dm.dm_number }}{% endblock %}
+{% block topbar_meta %}Delivery memo — {{ dm.packing_list.pl_number }}{% endblock %}
+
+{% block head_extra %}
+<style>
+@media print {
+  .sidebar,.topbar,.flash-container,.screen-only{display:none!important}
+  .main-wrapper{margin-left:0!important}
+  .page-content{padding:0!important}
+  body{background:white}
+  .dm-print-doc{display:block!important}
+  @page{margin:8mm 10mm;size:A4 portrait}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="screen-only">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h2>Dispatch Memo No. {{ dm.dm_number }}</h2>
+      <p>{{ dm.packing_list.pl_number }} &nbsp;·&nbsp; {{ dm.dispatch_date | fmt_date }} &nbsp;·&nbsp;
+         {{ dm.packing_list.work_orders|length }} WO{{ 's' if dm.packing_list.work_orders|length != 1 else '' }},
+         {{ dm.packing_list.total_rolls }} rolls,
+         {{ '%.3f'|format(dm.packing_list.total_net_kg) }} kg</p>
+    </div>
+    <div class="page-header-actions">
+      <a href="{{ url_for('dm_edit', dm_id=dm.id) }}" class="btn btn-ghost">Edit Details</a>
+      <form method="POST" action="{{ url_for('dm_delete', dm_id=dm.id) }}" style="margin:0"
+            onsubmit="return confirm('Delete DM {{ dm.dm_number }}?\n\nWork orders will revert to Ready status.')">
+        <button type="submit" class="btn btn-danger">Delete DM</button>
+      </form>
+      <button onclick="printDM()" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+          <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Print DM
+      </button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-body dm-info-grid">
+      <div><div class="detail-label">DM Number</div><div class="detail-value big">{{ dm.dm_number }}</div></div>
+      <div><div class="detail-label">Date</div><div class="detail-value">{{ dm.dispatch_date | fmt_date }}</div></div>
+      <div><div class="detail-label">Vehicle</div><div class="detail-value">{{ dm.vehicle_number or '—' }}</div></div>
+      <div><div class="detail-label">Customer</div><div class="detail-value">{{ dm.customer_name or '—' }}</div></div>
+    </div>
+    {% if dm.customer_address %}
+    <div style="padding:0 20px 16px;font-size:.85rem;color:var(--text-muted);white-space:pre-line">{{ dm.customer_address }}</div>
+    {% endif %}
+  </div>
+
+  {% for wo in dm.packing_list.work_orders %}
+  <div class="card mt-3">
+    <div class="card-header">
+      <div><h3>{{ wo.wo_number }}</h3>
+      <p>{{ wo.customer_name }} &nbsp;·&nbsp; {{ wo.product_type }} &nbsp;·&nbsp; {{ wo.size_mm|int }}mm × {{ wo.thickness_microns|int }}µ</p></div>
+      <div style="font-size:.85rem;color:var(--text-muted)">{{ wo.roll_count }} rolls &nbsp;·&nbsp; {{ '%.3f'|format(wo.total_produced_kg) }} kg net</div>
+    </div>
+  </div>
+  {% endfor %}
+</div><!-- /.screen-only -->
+
+<!-- ══ PRINT DOCUMENT ══════════════════════════════════════════════════════ -->
+<div class="dm-print-doc" id="dmPrintDoc" style="display:none">
+<div class="dm-wrap">
+
+  <!-- Header: "No." floated left, company block truly centred over full width -->
+  <div class="dm-header-wrap">
+    <div class="dm-no-corner">
+      <div class="dm-no-label">No.</div>
+      <div class="dm-no-value">{{ dm.dm_number }}</div>
+    </div>
+    <div class="dm-company-block">
+      <div class="dm-company-name">H I C &nbsp; INDUSTRIES</div>
+      <div class="dm-company-addr">B-69&amp;70 MIDC Industrial Area, Butibori, Nagpur - 441122</div>
+      <div class="dm-company-addr">Ph. : 9595290872 &nbsp;&nbsp; Email : hic.industries@gmail.com</div>
+      <div class="dm-company-gstin">GSTIN : 27AAHFH2211B1Z3</div>
+    </div>
+  </div>
+
+  <!-- Vehicle / DELIVERY MEMO / Date — single line -->
+  <div class="dm-meta-bar">
+    <span class="dm-meta-vehicle-text">Vehicle No.&nbsp;<strong>{{ dm.vehicle_number or '________________' }}</strong></span>
+    <span class="dm-meta-box">DELIVERY MEMO</span>
+    <span class="dm-meta-date-text">Date :&nbsp;<strong>{{ dm.dispatch_date.strftime('%-d/%-m/%y') }}</strong></span>
+  </div>
+
+  <!-- To / Address -->
+  <div class="dm-to-block">
+    <span class="dm-to-label">To,</span>
+    <span class="dm-to-name">{{ dm.customer_name }}</span>
+  </div>
+  <div class="dm-address-line">{{ dm.customer_address | replace('\n', ', ') }}</div>
+
+  <!-- Main entries table — only as many rows as there are WOs -->
+  <table class="dm-main-table" cellspacing="0" cellpadding="0">
+    <thead>
+      <tr class="dm-thead-row">
+        <th class="dm-th dm-col-sno">S.<br>No.</th>
+        <th class="dm-th dm-col-wo">W.O.<br>No.</th>
+        <th class="dm-th dm-col-desc">Product Description</th>
+        <th class="dm-th dm-col-qty">Qty.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for wo in dm.packing_list.work_orders %}
+      <tr class="dm-row">
+        <td class="dm-td dm-col-sno dm-center">{{ loop.index }}.</td>
+        <td class="dm-td dm-col-wo dm-center">{{ wo.wo_number | replace('WO','') }}</td>
+        <td class="dm-td dm-col-desc">
+          <div class="dm-prod-name">{{ wo.product_type }}</div>
+          <div class="dm-spec-line">{{ wo.size_mm|int }}mm &times; {{ wo.thickness_microns|int }}mic = {{ wo.roll_count }} Roll{{ 's' if wo.roll_count != 1 else '' }}</div>
+          <div class="dm-weights-row">
+            <div class="dm-wt-block"><div class="dm-wt-label">G.wt.</div><div class="dm-wt-value">{{ '%.3f'|format(wo.total_gross_kg) }}</div></div>
+            <div class="dm-wt-block"><div class="dm-wt-label">C.wt.</div><div class="dm-wt-value">{{ '%.3f'|format(wo.total_core_kg) }}</div></div>
+            <div class="dm-wt-block"><div class="dm-wt-label">N.wt.</div><div class="dm-wt-value">{{ '%.3f'|format(wo.total_produced_kg) }}</div></div>
+          </div>
+        </td>
+        <td class="dm-td dm-col-qty dm-right dm-qty-val">{{ '%.3f'|format(wo.total_produced_kg) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="dm-total-row">
+        <td colspan="3" class="dm-td dm-total-label">TOTAL</td>
+        <td class="dm-td dm-right dm-total-val">{{ '%.3f'|format(dm.packing_list.total_net_kg) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Legal text -->
+  <div class="dm-legal">U/ We hereby certify that our registration certification under the GST Act is in force on the date on which sale of goods specified in this Tax Invoice is made by me/us and that the transaction of sale covered by this Tax Invoice has been effected by me/us and it shall be accounted for the turnover of sales while filling of return and the due tax if any, payable on the sale has been paid or shall be paid.</div>
+  <div class="dm-received">Received the above mentioned material in Good Condition.</div>
+
+  <!-- Signatures — generous space -->
+  <table class="dm-sig-table" cellspacing="0" cellpadding="0">
+    <tr>
+      <td class="dm-sig-left">Receiver's Signature</td>
+      <td class="dm-sig-right">For <strong>HIC INDUSTRIES</strong></td>
+    </tr>
+  </table>
+
+</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printDM() {
+  const docEl = document.getElementById('dmPrintDoc');
+  if (!docEl) return;
+  const styleBlocks = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
+  const linkHref = document.querySelector('link[rel="stylesheet"]')?.href || '';
+  const linkTag = linkHref ? `<link rel="stylesheet" href="${linkHref}">` : '';
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title></title>${linkTag}${styleBlocks}
+    <style>body{margin:0;padding:0;background:white}.dm-print-doc{display:block!important}@page{margin:0;size:A4 portrait}</style>
+    </head><body>${docEl.outerHTML}</body></html>`;
+  const popup = window.open('', '_blank', 'width=794,height=1123');
+  popup.document.write(html);
+  popup.document.close();
+  popup.onload = () => setTimeout(() => { popup.focus(); popup.print(); setTimeout(() => popup.close(), 1000); }, 400);
+}
+</script>
+{% endblock %}

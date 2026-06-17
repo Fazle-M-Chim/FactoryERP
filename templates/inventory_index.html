@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block topbar_title %}Inventory{% endblock %}
+{% block topbar_meta %}Current raw material stock levels{% endblock %}
+
+{% block topbar_actions %}
+  <button onclick="printPage()" class="btn btn-outline btn-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+      <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+    </svg>
+    Print
+  </button>
+  <a href="{{ url_for('inventory_add_stock') }}" class="btn btn-primary btn-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg>
+    Add Stock / New Grade
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Raw Material Inventory</h2>
+    <p>Current stock levels for all grades. Click a grade to see its full transaction history.</p>
+  </div>
+</div>
+
+{% set total_grades = materials | length %}
+{% set low_stock = materials | selectattr('current_stock_kg', 'lt', 0) | list %}
+{% if low_stock %}
+<div class="info-banner" style="background:#FEF2F2;border-color:#FECACA;color:#991B1B">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+  <span><strong>{{ low_stock|length }} grade(s) are over-committed (negative stock):</strong>
+    {% for m in low_stock %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </span>
+</div>
+{% endif %}
+
+<div class="card">
+  {% if materials %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Grade</th>
+          <th>Description</th>
+          <th class="num-cell">Total In (kg)</th>
+          <th class="num-cell">Total Out (kg)</th>
+          <th class="num-cell">Current Stock (kg)</th>
+          <th class="actions-cell">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for mat in materials %}
+        {% set stock = mat.current_stock_kg %}
+        <tr onclick="window.location='{{ url_for('inventory_ledger', material_id=mat.id) }}'" style="cursor:pointer">
+          <td><strong style="color:var(--blue-primary)">{{ mat.name }}</strong></td>
+          <td class="text-muted">{{ mat.description or '—' }}</td>
+          <td class="num-cell" style="color:var(--success)">+{{ '%.3f'|format(mat.total_in_kg) }}</td>
+          <td class="num-cell" style="color:var(--danger)">-{{ '%.3f'|format(mat.total_out_kg) }}</td>
+          <td class="num-cell">
+            <strong style="font-size:1rem; color:{% if stock < 0 %}var(--danger){% elif stock < 50 %}var(--warning){% else %}var(--success){% endif %}">
+              {{ '%.3f'|format(stock) }} kg
+            </strong>
+            {% if stock < 0 %}
+            <span style="font-size:.72rem;color:var(--danger);display:block">⚠ Over-committed</span>
+            {% endif %}
+          </td>
+          <td class="actions-cell" onclick="event.stopPropagation()">
+            <div class="flex gap-1">
+              <a href="{{ url_for('inventory_ledger', material_id=mat.id) }}" class="btn btn-ghost btn-sm">History</a>
+              <button type="button" class="btn btn-outline btn-sm"
+                      onclick="openAdjust({{ mat.id }}, '{{ mat.name }}', {{ stock }})">Adjust</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--blue-light)">
+          <td colspan="2" style="padding:10px 16px;font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;color:var(--blue-primary)">
+            Total ({{ total_grades }} grades)
+          </td>
+          <td class="num-cell" style="padding:10px 16px;font-weight:700;color:var(--success)">
+            +{{ '%.3f'|format(materials | sum(attribute='total_in_kg')) }} kg
+          </td>
+          <td class="num-cell" style="padding:10px 16px;font-weight:700;color:var(--danger)">
+            -{{ '%.3f'|format(materials | sum(attribute='total_out_kg')) }} kg
+          </td>
+          <td class="num-cell" style="padding:10px 16px;font-weight:700;color:var(--blue-primary)">
+            {{ '%.3f'|format(materials | sum(attribute='current_stock_kg')) }} kg
+          </td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M20 7l-8-4-8 4m16 0v10l-8 4m0-14L4 17m8-14v14"/>
+    </svg>
+    <h3>No Inventory Yet</h3>
+    <p>Add stock for raw material grades, or create recipes — grades are added automatically.</p>
+    <a href="{{ url_for('inventory_add_stock') }}" class="btn btn-primary mt-2" style="display:inline-flex;align-items:center;gap:6px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg>
+      Add Stock / New Grade
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Adjustment modal -->
+<div id="adjustModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:28px;width:380px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <h3 style="margin-bottom:4px" id="adjTitle">Adjust Stock</h3>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px" id="adjSub">Current stock: —</p>
+    <form method="POST" action="{{ url_for('inventory_adjust') }}">
+      <input type="hidden" name="material_id" id="adjMatId">
+      <div class="form-group mb-2">
+        <label>Adjustment (kg) — use negative to remove</label>
+        <input type="number" name="qty_kg" step="0.001" required placeholder="e.g. +50 or -10" id="adjQty">
+        <span class="form-hint">Positive = add stock · Negative = remove stock</span>
+      </div>
+      <div class="form-group mb-3">
+        <label>Reason</label>
+        <input type="text" name="notes" placeholder="e.g. Stock count correction, wastage…">
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="btn btn-primary" style="flex:1">Apply Adjustment</button>
+        <button type="button" class="btn btn-ghost" onclick="closeAdjust()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+function printPage() {
+  const title = 'Raw Material Inventory — HIC Industries';
+  const tableHTML = document.querySelector('.table-wrap')?.outerHTML || '<p>No data</p>';
+  const css = document.querySelector('link[rel="stylesheet"]')?.href || '';
+  const now = new Date().toLocaleDateString('en-IN', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <link rel="stylesheet" href="${css}">
+    <style>
+      body{font-family:Arial,sans-serif;font-size:10pt;padding:16px}
+      h2{font-size:13pt;margin-bottom:4px}
+      p.sub{font-size:9pt;color:#666;margin-bottom:12px}
+      table{width:100%;border-collapse:collapse;font-size:9.5pt}
+      th,td{border:1px solid #ccc;padding:5px 8px}
+      th{background:#f0f0f0;font-weight:700}
+      tfoot td{font-weight:700;background:#e8f0fe}
+      @page{margin:12mm}
+    </style></head><body>
+    <h2>${title}</h2>
+    <p class="sub">Printed: ${now} &nbsp;|&nbsp; All values in kg</p>
+    ${tableHTML}
+  </body></html>`;
+  const w = window.open('','_blank','width=900,height=700');
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 800); }, 250);
+}
+</script>
+{% endblock %}
