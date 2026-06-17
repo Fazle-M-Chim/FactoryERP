@@ -111,8 +111,10 @@
             <td class="actions-cell">
               <div class="flex gap-1" style="justify-content:flex-end">
                 <button type="button" class="btn btn-outline btn-sm"
-                        onclick="loadEditForm({{ c.id }}, {{ c.name | tojson }}, {{ c.address | tojson }})">
-                  Edit</button>
+                        data-edit-id="{{ c.id }}"
+                        data-edit-name="{{ c.name | e }}"
+                        data-edit-address="{{ c.address | e }}"
+                        onclick="loadEditForm(this)">Edit</button>
                 <form method="POST" action="{{ url_for('customers_manage') }}" style="margin:0">
                   <input type="hidden" name="action" value="toggle">
                   <input type="hidden" name="customer_id" value="{{ c.id }}">
@@ -156,7 +158,10 @@
 
 {% block scripts %}
 <script>
-function loadEditForm(id, name, address) {
+function loadEditForm(btn) {
+  const id      = btn.dataset.editId;
+  const name    = btn.dataset.editName;
+  const address = btn.dataset.editAddress;
   document.getElementById('addForm').style.display = 'none';
   document.getElementById('editForm').style.display = 'block';
   document.getElementById('formTitle').textContent = 'Edit Customer';

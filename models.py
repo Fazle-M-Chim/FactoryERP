@@ -496,3 +496,12 @@ class InventoryLedger(db.Model):
     @property
     def txn_label(self):
         return self.TXN_LABELS.get(self.txn_type, self.txn_type)
+
+    @property
+    def customer_name(self):
+        """Look up customer name when this entry was caused by a work order."""
+        if self.txn_type == "work_order" and self.reference:
+            wo = WorkOrder.query.filter_by(wo_number=self.reference).first()
+            if wo:
+                return wo.customer_name
+        return ""

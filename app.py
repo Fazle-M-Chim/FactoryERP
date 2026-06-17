@@ -1377,4 +1377,4 @@ if __name__ == "__main__":
     # arbitrary code execution) is never exposed accidentally. To develop
     # locally with auto-reload, run:  HIC_DEBUG=1 python app.py
     debug_mode = os.environ.get("HIC_DEBUG", "").lower() in ("1", "true", "yes")
-    app.run(debug=debug_mode, host="127.0.0.1", port=5000)
+    app.run(debug=debug_mode, host="0.0.0.0", port=8080)
