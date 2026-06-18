@@ -41,9 +41,11 @@ app.jinja_env.filters["fmt_date"] = fmt_date
 
 app.config["SECRET_KEY"] = os.environ.get("HIC_SECRET_KEY") or os.urandom(32).hex()
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(
-    os.path.abspath(os.path.dirname(__file__)), "instance", "hic.db"
-)
+# On Railway, use /data (persistent volume). Locally, use instance/hic.db
+_db_dir = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", 
+           os.path.join(os.path.abspath(os.path.dirname(__file__)), "instance"))
+os.makedirs(_db_dir, exist_ok=True)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(_db_dir, "hic.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
@@ -1377,4 +1379,5 @@ if __name__ == "__main__":
     # arbitrary code execution) is never exposed accidentally. To develop
     # locally with auto-reload, run:  HIC_DEBUG=1 python app.py
     debug_mode = os.environ.get("HIC_DEBUG", "").lower() in ("1", "true", "yes")
-    app.run(debug=debug_mode, host="0.0.0.0", port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(debug=debug_mode, host="0.0.0.0", port=port)

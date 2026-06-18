@@ -238,57 +238,16 @@ Timestamps are stored in UTC in the database and converted via the `| ist` Jinja
 
 ## Responsive Design
 
-The app is built mobile-first-friendly: one stylesheet, progressive enhancement,
-no separate mobile site. Desktop is unchanged; phones get a native-app-style
-experience.
-
-### Breakpoints
+Four CSS breakpoints:
 
 | Breakpoint | Width | Behaviour |
 |---|---|---|
-| XL | >1400px | Wider sidebar (260px), more padding, 5-column stat row |
+| XL | >1400px | Wider sidebar (260px), more padding |
 | MD | 900–1200px | Narrower sidebar (220px), layouts stack — **square monitors** |
-| SM | ≤900px | **Bottom tab bar** appears; sidebar becomes a hamburger drawer; grids stack; tables scroll inside their card; 16px inputs; 44px tap targets |
-| XS | ≤600px | 13px base font, 2-up stat cards, single-column detail grids, full-width action buttons |
+| SM | ≤900px | Hamburger drawer sidebar, all grids single-column, tables scroll |
+| XS | ≤600px | 13px base font, tighter padding, icon-only sign out |
 
-### Mobile navigation — bottom tab bar
-On phones (≤900px) a fixed bottom tab bar provides primary navigation, like a
-native app. It is **role-aware**:
-- **Admin / Supervisor:** Orders · Production · Packing · Dispatch · More
-- **Operator:** Orders · Production · Sign Out
-
-The Production tab shows a badge with the count of in-production work orders. The
-**More** tab opens the full slide-in drawer (Recipes, Customers, Product Types,
-Users, Inventory) for secondary destinations. The tab bar respects the iPhone
-home-indicator safe area (`env(safe-area-inset-bottom)`), and page content
-reserves space so nothing hides behind it.
-
-### Key mobile-correctness fix
-Flex/grid children default to `min-width: auto` and refuse to shrink below their
-content width. A wide data table (e.g. the 10-column dashboard) therefore used to
-stretch the whole page, pushing stat cards off-screen and causing horizontal page
-scroll. The fix: `min-width: 0` on `.main-wrapper`, `.page-content`, and all
-grid/flex layout children, plus `overflow: hidden` containment on cards. Wide
-tables now scroll **inside their own card** (with a subtle right-edge fade hint
-that disappears when the table fits) instead of stretching the layout. Verified
-zero horizontal page overflow on every screen at 390px and 768px.
-
-### iOS / touch polish
-- **16px inputs** everywhere (including login) so Safari never auto-zooms on focus
-- **44px minimum tap targets** for buttons; 36px for small buttons
-- Momentum scrolling (`-webkit-overflow-scrolling: touch`) on scrollable tables
-- Sticky topbar; icon-only sign-out and Print buttons on phones to save width;
-  the page title truncates so action buttons always fit
-- `viewport-fit=cover` + `theme-color` + Apple web-app meta tags for a clean
-  "Add to Home Screen" experience (standalone-style, dark status bar)
-
-### Print documents
-All print layouts (Packing List, Delivery Memo, Recipe sheet, Inventory reports)
-are completely untouched by the mobile layer — they render via their own
-`@media print` rules and remain pixel-identical. Verified by rendering the DM in
-print media after the mobile changes.
-
-Tested on Mac (wide + square monitor), tablet (768px), and iPhone Safari (390px).
+The production split panel stacks to single column at ≤1100px. All tables have `overflow-x: auto` for horizontal scrolling on narrow screens. Tested on Mac (wide + square), iPhone Safari.
 
 ---
 
@@ -366,9 +325,8 @@ GSTIN: 27AAHFH2211B1Z3
 | v26 | Inventory adjust modal working; professional print documents for inventory and ledger |
 | v27 | Customer edit fixed (data attributes, no quote collision); customer name in ledger; notes optional |
 | v28 | Server listens on 0.0.0.0:8080 — accessible from all devices on local network |
-| v29 | **Mobile experience overhaul:** native-style bottom tab bar (role-aware, with in-production badge); fixed the flex/grid `min-width:auto` bug that caused horizontal page overflow on phones; tables now scroll inside their card with an edge-fade hint; 16px inputs (no iOS zoom), 44px tap targets, safe-area insets, `viewport-fit=cover` + Apple web-app meta tags; responsive login; print documents verified unchanged |
 
 ---
 
-*Last updated: June 2026 — v29*  
+*Last updated: June 2026 — v28*  
 *HIC Industries Production Management System*

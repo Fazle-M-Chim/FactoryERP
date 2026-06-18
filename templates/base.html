@@ -2,12 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#1B4F8A" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="HIC" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>{% block title %}HIC Industries{% endblock %} — HIC Industries</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
@@ -242,66 +237,6 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-
-  <!-- ── MOBILE BOTTOM TAB BAR (shown ≤900px via CSS) ──────────────────────── -->
-  {% if current_user.is_authenticated %}
-  <nav class="mobile-tabbar" aria-label="Primary">
-    <a href="{{ url_for('dashboard') }}"
-       class="mtab {% if request.endpoint in ['dashboard','work_order_detail','work_order_new'] %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
-      <span>Orders</span>
-    </a>
-
-    <a href="{{ url_for('dashboard', status='in_production') }}"
-       class="mtab {% if request.endpoint == 'production' %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3"/>
-      </svg>
-      {% if g.in_production_wos is defined and g.in_production_wos %}
-      <span class="mtab-badge">{{ g.in_production_wos|length }}</span>
-      {% endif %}
-      <span>Production</span>
-    </a>
-
-    {% if current_user.role in ['admin','supervisor'] %}
-    <a href="{{ url_for('packing_list_index') }}"
-       class="mtab {% if request.endpoint in ['packing_list_index','packing_list_new','packing_list_detail'] %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-      </svg>
-      <span>Packing</span>
-    </a>
-
-    <a href="{{ url_for('dm_index') }}"
-       class="mtab {% if request.endpoint in ['dm_index','dm_new','dm_detail','dm_edit'] %}active{% endif %}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-      </svg>
-      <span>Dispatch</span>
-    </a>
-    {% endif %}
-
-    {% if current_user.role == 'operator' %}
-    <a href="{{ url_for('logout') }}" class="mtab">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-      </svg>
-      <span>Sign Out</span>
-    </a>
-    {% else %}
-    <button type="button" class="mtab" onclick="toggleSidebar()" aria-label="More menu">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-      </svg>
-      <span>More</span>
-    </button>
-    {% endif %}
-  </nav>
-  {% endif %}
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   <script>
