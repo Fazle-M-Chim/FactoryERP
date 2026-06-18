@@ -39,7 +39,16 @@ app.jinja_env.filters["ist"]      = to_ist
 app.jinja_env.filters["fmt_date"] = fmt_date
 
 
-app.config["SECRET_KEY"] = os.environ.get("HIC_SECRET_KEY") or os.urandom(32).hex()
+# SECRET_KEY MUST be set as an environment variable in production.
+# If missing, we generate a temporary one and print a loud warning —
+# this means sessions will not survive restarts or multi-worker deployments.
+_secret = os.environ.get("HIC_SECRET_KEY")
+if not _secret:
+    _secret = os.urandom(32).hex()
+    import sys
+    print("WARNING: HIC_SECRET_KEY environment variable is not set.", file=sys.stderr)
+    print("WARNING: Sessions will be lost on every restart. Set HIC_SECRET_KEY in your environment.", file=sys.stderr)
+app.config["SECRET_KEY"] = _secret
 
 # On Railway, use /data (persistent volume). Locally, use instance/hic.db
 _db_dir = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", 
@@ -47,6 +56,12 @@ _db_dir = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH",
 os.makedirs(_db_dir, exist_ok=True)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + os.path.join(_db_dir, "hic.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Session settings — ensure sessions persist across requests on Railway
+app.config["PERMANENT_SESSION_LIFETIME"] = 86400 * 30    # 30 days
+app.config["SESSION_COOKIE_HTTPONLY"]     = True
+app.config["SESSION_COOKIE_SAMESITE"]     = "Lax"
+# Use Secure cookies on HTTPS (Railway), plain HTTP locally
+app.config["SESSION_COOKIE_SECURE"]       = os.environ.get("RAILWAY_ENVIRONMENT") is not None
 
 db.init_app(app)
 
@@ -212,6 +227,7 @@ def login():
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
         if user and user.is_active and user.check_password(password):
+            session.permanent = True   # use PERMANENT_SESSION_LIFETIME
             login_user(user, remember=True)
             flash(f"Welcome, {user.username}.", "success")
             return redirect(request.args.get("next") or url_for("dashboard"))
