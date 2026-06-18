@@ -31,4 +31,16 @@ document.addEventListener("DOMContentLoaded", () => {
     grossInput.addEventListener("input", calculateNet);
     coreInput.addEventListener("input", calculateNet);
   }
+
+  // ── Mobile table scroll hint ──────────────────────────────────────────────
+  // The CSS adds a right-edge fade on .table-wrap to signal horizontal scroll.
+  // Remove it when the table actually fits, so non-scrolling tables look clean.
+  const updateTableScrollHints = () => {
+    document.querySelectorAll(".table-wrap").forEach(wrap => {
+      const overflowing = wrap.scrollWidth > wrap.clientWidth + 1;
+      wrap.classList.toggle("no-scroll", !overflowing);
+    });
+  };
+  updateTableScrollHints();
+  window.addEventListener("resize", updateTableScrollHints);
 });

@@ -170,10 +170,18 @@ body {
 .main-wrapper {
   margin-left: var(--sidebar-w);
   flex: 1;
+  /* min-width:0 lets this flex item shrink below the intrinsic width of wide
+     content (e.g. 10-column tables). Without it, a wide table stretches the
+     whole page and breaks every mobile layout (stat cards bleed off-screen,
+     horizontal page scroll). Tables now scroll inside .table-wrap instead. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
+
+/* Page content should also never force the wrapper wider than the viewport. */
+.page-content { min-width: 0; }
 
 .topbar {
   height: var(--topbar-h);
@@ -2641,4 +2649,200 @@ select { cursor: pointer; }
   padding-top: 6px;
   text-align: center;
   margin-top: 10px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE EXPERIENCE LAYER  (added v29)
+   A great phone experience without a separate mobile site:
+     • Bottom tab bar for primary navigation (native-app feel)
+     • Clean, contained horizontal table scrolling (no page bleed)
+     • iOS polish: 16px inputs (no zoom), 44px tap targets, safe-area insets
+     • Tightened layouts for small screens
+   Desktop (>900px) is unaffected. Print documents are never touched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The bottom tab bar is hidden by default (desktop). Shown only ≤900px. */
+.mobile-tabbar { display: none; }
+
+/* ── Clean table scrolling on all touch widths ──────────────────────────────
+   Wide tables scroll inside their wrapper with momentum + a subtle edge fade
+   hint so users know there's more to the right. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (max-width: 900px) {
+  /* Safety net: nothing should be able to stretch the page wider than the
+     viewport. Cards and their contents stay within bounds; wide tables scroll
+     inside .table-wrap rather than pushing the card (and page) wider. */
+  .card { min-width: 0; max-width: 100%; overflow: hidden; }
+  .card .table-wrap { max-width: 100%; min-width: 0; overflow-x: auto; }
+  .card-header { min-width: 0; }
+  .card-header > div { min-width: 0; }
+
+  /* Grid/flex layout children default to min-width:auto and refuse to shrink
+     below their content — which lets an inner wide table push the whole page.
+     Force them to allow shrinking so .table-wrap scrolls internally. */
+  .wo-detail-layout > *,
+  .two-col-layout > *,
+  .two-col-layout-wide > *,
+  .prod-split-layout > *,
+  .production-layout > * { min-width: 0; }
+
+  /* Reserve space for the bottom tab bar so content/scroll never hides
+     behind it (plus iOS home-indicator safe area). */
+  :root { --tabbar-h: 58px; }
+  .page-content {
+    padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  /* ── BOTTOM TAB BAR ──────────────────────────────────────────────────── */
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--white);
+    border-top: 1px solid var(--grey-200);
+    box-shadow: 0 -2px 12px rgba(0,0,0,.06);
+    z-index: 180;
+    justify-content: space-around;
+    align-items: stretch;
+  }
+  .mtab {
+    flex: 1 1 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-decoration: none;
+    color: var(--grey-600);
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    padding: 6px 2px 4px;
+    min-width: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--transition);
+  }
+  .mtab svg { width: 22px; height: 22px; stroke-width: 2; flex-shrink: 0; }
+  .mtab span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mtab.active { color: var(--blue-accent); }
+  .mtab.active svg { stroke-width: 2.4; }
+  .mtab:active { background: var(--grey-50); }
+
+  /* Badge on a tab (e.g. in-production count) */
+  .mtab-badge {
+    position: absolute;
+    transform: translate(14px, -10px);
+    background: var(--danger);
+    color: #fff;
+    font-size: .6rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+  }
+
+  /* ── iOS / touch input polish ──────────────────────────────────────────
+     16px font prevents Safari's auto-zoom on focus; comfortable tap height. */
+  input[type="text"], input[type="number"], input[type="date"],
+  input[type="password"], select, textarea {
+    font-size: 16px;
+    padding: 11px 12px;
+  }
+
+  /* 44px minimum tap targets for all buttons */
+  .btn {
+    min-height: 44px;
+    padding: 11px 18px;
+    font-size: .95rem;
+  }
+  .btn-sm {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: .85rem;
+  }
+
+  /* Bigger, easier flash close + sign-out hit areas */
+  .flash-close { min-width: 32px; min-height: 32px; }
+
+  /* ── Topbar: simpler on phones ──────────────────────────────────────────
+     The bottom bar now carries navigation, so the topbar just shows the page
+     title + a compact sign-out. The hamburger still opens the full drawer for
+     less-common destinations (settings, recipes, etc.). */
+  .topbar { position: sticky; top: 0; z-index: 150; padding: 0 12px; gap: 8px; }
+  .topbar-username { display: none; }
+  /* Let the title block shrink and truncate so the action buttons + sign-out
+     always fit within the viewport. */
+  .topbar > div:not(.topbar-spacer):not(.topbar-user) { min-width: 0; overflow: hidden; }
+  .topbar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-user { flex-shrink: 0; }
+  /* Compact topbar buttons on phones (but keep their labels — some are
+     text-only like "Edit"/"View Production"). */
+  .topbar .btn { padding: 8px 11px; font-size: .8rem; min-height: 38px; white-space: nowrap; }
+  .topbar .btn > svg { width: 15px; height: 15px; }
+  .topbar-actions, .page-header-actions { min-width: 0; }
+
+  /* Sign-out stays icon-only — placed after the .topbar .btn rule so it wins
+     the cascade (both are .btn). */
+  .topbar .btn.topbar-signout { font-size: 0; padding: 8px 10px; gap: 0; }
+  .topbar .btn.topbar-signout svg { width: 18px; height: 18px; }
+
+  /* Topbar Print buttons are always .btn-outline with a printer icon — show
+     icon only on phones to save width (printing A4 docs is a desktop task). */
+  .topbar .btn.btn-outline { font-size: 0; gap: 0; padding: 8px 10px; }
+  .topbar .btn.btn-outline > svg { width: 17px; height: 17px; }
+
+  /* Wide tables: hint that they scroll sideways */
+  .table-wrap {
+    position: relative;
+    border-radius: var(--radius-lg);
+    -webkit-mask-image: linear-gradient(to right, #000 92%, transparent);
+            mask-image: linear-gradient(to right, #000 92%, transparent);
+  }
+  /* Remove the fade mask when the table fits (no scroll) via a helper class
+     toggled in JS. */
+  .table-wrap.no-scroll { -webkit-mask-image: none; mask-image: none; }
+}
+
+/* ── XS phone portrait extras (≤600px) ── */
+@media (max-width: 600px) {
+  /* auto-fit grids built on minmax(180–220px) can't fit two columns on a phone
+     and end up forcing horizontal page overflow. Pin them to safe layouts. */
+  .detail-grid { grid-template-columns: 1fr 1fr; gap: 14px 16px; min-width: 0; }
+  .detail-grid .detail-item { min-width: 0; }
+  .detail-grid .detail-value,
+  .detail-grid .detail-value.big { overflow-wrap: anywhere; word-break: break-word; }
+  .form-grid   { grid-template-columns: 1fr; }
+  .stats-row   { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Page header action buttons stack full-width and are easy to tap */
+  .page-header-actions { width: 100%; gap: 8px; }
+  .page-header-actions .btn { flex: 1 1 auto; }
+
+  /* Stat cards: 2-up, compact */
+  .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* The big "New …" button in the topbar is redundant with the tab bar +
+     page actions on phones; keep it but let it shrink to an icon if needed. */
+  .topbar-actions-text { display: none; }
+}
+
+/* ── Larger phones / small tablets keep 3 stat columns ── */
+@media (min-width: 601px) and (max-width: 900px) {
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
 }
