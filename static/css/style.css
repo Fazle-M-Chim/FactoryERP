@@ -2642,3 +2642,131 @@ select { cursor: pointer; }
   text-align: center;
   margin-top: 10px;
 }
+
+/* ── Dashboard filter bar ── */
+.dash-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.dash-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-filter-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+}
+
+.dash-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dash-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--grey-200);
+  background: var(--grey-50);
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-dark);
+  transition: all .15s;
+  white-space: nowrap;
+}
+
+.dash-pill:hover { border-color: var(--blue-accent); color: var(--blue-accent); }
+
+.dash-pill.active {
+  background: var(--blue-accent);
+  border-color: var(--blue-accent);
+  color: white;
+}
+
+@media (max-width: 900px) {
+  .dash-filter-bar { gap: 10px; }
+  .dash-pill        { padding: 4px 10px; font-size: .75rem; }
+}
+
+/* ── Dashboard compact table ─────────────────────────────── */
+.wo-table {
+  table-layout: fixed;
+  width: 100%;
+  font-size: .82rem;
+}
+
+/*
+  Content width ≈ viewport − sidebar(240) − page-padding(48) − scrollbar(8)
+  At 1280px: ~984px. Column budget uses % for flexible columns.
+*/
+/* Column widths: fixed columns use px, flexible (cust+prod) use %.
+   Total fixed: 28+70+76+52+86+80+68+88 = 548px
+   Remaining (~436px on 1280px screen) split 40/60 between cust and prod. */
+.wo-col-check  { width: 28px;  padding: 8px 4px 8px 14px; text-align: center; }
+.wo-col-wo     { width: 70px;  }
+.wo-col-cust   { width: 11%;   }   /* narrower — long names wrap to 2nd line */
+.wo-col-prod   { width: 17%;   }   /* narrower — long product names wrap nicely */
+.wo-col-spec   { width: 76px;  }
+.wo-col-qty    { width: 52px;  text-align: right; }
+.wo-col-prog   { width: 80px;  }
+.wo-col-status { width: 78px;  }
+.wo-col-date   { width: 68px;  }
+.wo-col-act    { width: 86px;  text-align: right; white-space: nowrap; }
+
+/* Tighter row padding */
+.wo-table thead th { padding: 8px 8px; font-size: .70rem; }
+.wo-table tbody td { padding: 7px 8px; vertical-align: top; }
+.wo-table .wo-col-check  { vertical-align: middle; }
+.wo-table .wo-col-act    { vertical-align: middle; }
+.wo-table .wo-col-status { vertical-align: middle; }
+.wo-table .wo-col-prog   { vertical-align: middle; }
+.wo-table .wo-col-qty    { vertical-align: middle; }
+
+/* Product and customer: wrap so full text is visible */
+.wo-cell-wrap {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  font-size: .79rem;
+}
+
+.wo-cell-nowrap { white-space: nowrap; }
+
+/* select-all checkbox */
+.wo-table thead th.wo-col-check { text-align: center; padding-left: 14px; }
+
+/* Dash select inputs */
+.dash-select {
+  padding: 6px 10px;
+  font-size: .82rem;
+  border: 1.5px solid var(--grey-200);
+  border-radius: var(--radius);
+  font-family: inherit;
+  background: white;
+  color: var(--text-dark);
+}
+
+/* Medium screens: drop spec + date */
+@media (max-width: 1200px) {
+  .wo-col-spec { display: none; }
+  .wo-col-date { display: none; }
+}
+
+/* Small screens: also drop qty + progress, free up column widths */
+@media (max-width: 900px) {
+  .wo-table { table-layout: auto; font-size: .78rem; }
+  .wo-col-qty  { display: none; }
+  .wo-col-prog { display: none; }
+  .wo-col-cust { width: auto; }
+  .wo-col-prod { width: auto; }
+}
+

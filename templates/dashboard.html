@@ -1,126 +1,365 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block topbar_title %}Dashboard{% endblock %}
-{% block topbar_meta %}
-  {% if active_filter == 'all' %}All Work Orders
-  {% elif active_filter == 'open' %}Open Orders
-  {% elif active_filter == 'in_production' %}In Production
-  {% elif active_filter == 'ready' %}Ready
-  {% elif active_filter == 'dispatched' %}Dispatched
-  {% endif %}
-{% endblock %}
+{% block topbar_meta %}Work Orders{% endblock %}
 
 {% block topbar_actions %}
-  <a href="{{ url_for('work_order_new') }}" class="btn btn-primary btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px"><path d="M12 5v14M5 12h14"/></svg> New Work Order</a>
+  {% if current_user.role == 'admin' %}
+  <a href="{{ url_for('work_order_new') }}" class="btn btn-primary btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg> New Work Order</a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
 
-<!-- Stats Row -->
-<div class="stats-row">
-  <div class="stat-card accent">
-    <div class="stat-value">{{ counts.all }}</div>
-    <div class="stat-label">Total Orders</div>
+<!-- ── Stat cards ── -->
+<div class="stats-row mb-3">
+  <div class="stat-card accent" style="cursor:pointer" onclick="setStatusFilter('all')">
+    <div class="stat-value" id="cnt-all">{{ counts.all }}</div>
+    <div class="stat-label">Total</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:var(--info)">{{ counts.open }}</div>
+  <div class="stat-card" style="cursor:pointer" onclick="setStatusFilter('open')">
+    <div class="stat-value" style="color:var(--info)" id="cnt-open">{{ counts.open }}</div>
     <div class="stat-label">Open</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:var(--warning)">{{ counts.in_production }}</div>
+  <div class="stat-card" style="cursor:pointer" onclick="setStatusFilter('in_production')">
+    <div class="stat-value" style="color:var(--warning)" id="cnt-prod">{{ counts.in_production }}</div>
     <div class="stat-label">In Production</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:#2E7D32">{{ counts.ready }}</div>
+  <div class="stat-card" style="cursor:pointer" onclick="setStatusFilter('ready')">
+    <div class="stat-value" style="color:#2E7D32" id="cnt-ready">{{ counts.ready }}</div>
     <div class="stat-label">Ready</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-value" style="color:#5E35B1">{{ counts.dispatched }}</div>
+  <div class="stat-card" style="cursor:pointer" onclick="setStatusFilter('dispatched')">
+    <div class="stat-value" style="color:#5E35B1" id="cnt-disp">{{ counts.dispatched }}</div>
     <div class="stat-label">Dispatched</div>
   </div>
 </div>
 
-<!-- Work Orders table — full width -->
-<div class="card">
-    <div class="card-header">
-      <div>
-        <h2>{% if active_filter == 'all' %}All Work Orders
-            {% elif active_filter == 'open' %}Open Orders
-            {% elif active_filter == 'in_production' %}In Production
-            {% elif active_filter == 'ready' %}Ready
-            {% elif active_filter == 'dispatched' %}Dispatched
-{% endif %}</h2>
-        <p>Click any row to view details</p>
+<!-- ── Filter bar ── -->
+<div class="card mb-3">
+  <div class="card-body" style="padding:12px 16px">
+    <div class="dash-filter-bar">
+      <div class="dash-filter-group">
+        <label class="dash-filter-label">Status</label>
+        <div class="dash-pills" id="statusPills">
+          <button class="dash-pill active" data-status="all"           onclick="setStatusFilter('all')">All</button>
+          <button class="dash-pill"        data-status="open"          onclick="setStatusFilter('open')">Open</button>
+          <button class="dash-pill"        data-status="in_production" onclick="setStatusFilter('in_production')">In Production</button>
+          <button class="dash-pill"        data-status="ready"         onclick="setStatusFilter('ready')">Ready</button>
+          <button class="dash-pill"        data-status="dispatched"    onclick="setStatusFilter('dispatched')">Dispatched</button>
+        </div>
+      </div>
+      <div class="dash-filter-group">
+        <label class="dash-filter-label">Sort</label>
+        <select id="sortSelect" onchange="applyFilters()" class="dash-select">
+          <option value="date_desc">Newest first</option>
+          <option value="date_asc">Oldest first</option>
+          <option value="wo_asc">WO No. A→Z</option>
+          <option value="wo_desc">WO No. Z→A</option>
+          <option value="customer_asc">Customer A→Z</option>
+          <option value="progress_desc">Progress high→low</option>
+          <option value="weight_desc">Order size large→small</option>
+        </select>
+      </div>
+      {% if product_types %}
+      <div class="dash-filter-group">
+        <label class="dash-filter-label">Product</label>
+        <select id="productFilter" onchange="applyFilters()" class="dash-select">
+          <option value="">All products</option>
+          {% for pt in product_types %}
+          <option value="{{ pt }}">{{ pt }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      {% if customers %}
+      <div class="dash-filter-group">
+        <label class="dash-filter-label">Customer</label>
+        <select id="customerFilter" onchange="applyFilters()" class="dash-select">
+          <option value="">All customers</option>
+          {% for cust in customers %}
+          <option value="{{ cust }}">{{ cust }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="dash-filter-group" style="flex:1;min-width:140px">
+        <label class="dash-filter-label">Search</label>
+        <input type="text" id="searchInput" placeholder="WO no., customer, product…"
+               oninput="applyFilters()" class="dash-select">
+      </div>
+      <div class="dash-filter-group" style="align-self:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="resetFilters()">Reset</button>
       </div>
     </div>
 
-    {% if work_orders %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>WO No.</th>
-            <th>Customer</th>
-            <th>Product</th>
-            <th class="num-cell">Size</th>
-            <th class="num-cell">Thick.</th>
-            <th class="num-cell">Order Qty</th>
-            <th>Progress</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th class="actions-cell">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for wo in work_orders %}
-          <tr style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
-            <td><span style="font-weight:700; color:var(--blue-primary)">{{ wo.wo_number }}</span></td>
-            <td>{{ wo.customer_name }}</td>
-            <td>{{ wo.product_type }}</td>
-            <td class="num-cell">{{ wo.size_mm | int }} mm</td>
-            <td class="num-cell">{{ wo.thickness_microns | int }} µ</td>
-            <td class="num-cell">{{ wo.total_weight_kg | int }} kg</td>
-            <td style="min-width:130px">
-              <div class="progress-wrap">
-                <div class="progress-bar-outer">
-                  <div class="progress-bar-inner {% if wo.progress_pct >= 100 %}full{% endif %}"
-                       style="width: {{ wo.progress_pct }}%"></div>
-                </div>
-                <span class="progress-pct">{{ wo.progress_pct }}%</span>
-              </div>
-              <div style="font-size:.72rem; color:var(--text-muted); margin-top:2px">
-                {{ '%.1f'|format(wo.total_produced_kg) }} / {{ wo.total_weight_kg | int }} kg ({{ wo.roll_count }} rolls)
-              </div>
-            </td>
-            <td><span class="badge {{ wo.status_css }}">{{ wo.status_label }}</span></td>
-            <td><span class="text-muted">{{ wo.created_at | ist | truncate(10, True, '') }}</span></td>
-            <td class="actions-cell" onclick="event.stopPropagation()">
-              <div class="flex gap-1">
-                <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}" class="btn btn-ghost btn-sm">View</a>
-                {% if wo.status == 'open' %}<a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Start</a>
-                {% elif wo.status == 'in_production' %}<a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Rolls</a>
-                {% elif wo.status == 'ready' %}<a href="{{ url_for('packing_list_index') }}" class="btn btn-outline btn-sm">Pack</a>
-                {% elif wo.status == 'dispatched' %}<a href="{{ url_for('dm_index') }}" class="btn btn-outline btn-sm">DM</a>
-                {% else %}<a href="{{ url_for('dm_index') }}" class="btn btn-outline btn-sm">DM</a>{% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- Bulk action bar — shown when checkboxes selected -->
+    <div id="bulkBar" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--grey-100);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:.82rem;font-weight:600;color:var(--blue-primary)" id="bulkCount">0 selected</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <form method="POST" action="{{ url_for('bulk_start_production') }}" id="bulkStartForm" style="margin:0">
+          <input type="hidden" name="wo_ids" id="bulkStartIds">
+          <button type="submit" class="btn btn-primary btn-sm" id="bulkStartBtn" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Start Production</button>
+        </form>
+        <form method="POST" action="{{ url_for('bulk_undo_production') }}" id="bulkUndoForm" style="margin:0">
+          <input type="hidden" name="wo_ids" id="bulkUndoIds">
+          <button type="submit" class="btn btn-ghost btn-sm" id="bulkUndoBtn" disabled>↩ Undo Production</button>
+        </form>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
+      </div>
     </div>
-    {% else %}
-    <div class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
-      </svg>
-      <h3>No Work Orders Found</h3>
-      <p>{% if active_filter != 'all' %}No orders at this stage.{% else %}Create your first work order to get started.{% endif %}</p>
-      {% if active_filter == 'all' %}
-      <a href="{{ url_for('work_order_new') }}" class="btn btn-primary mt-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg> New Work Order</a>
-      {% endif %}
+
+    <div style="font-size:.75rem;color:var(--text-muted);margin-top:8px">
+      Showing <strong id="visibleCount">{{ work_orders|length }}</strong> of {{ work_orders|length }} orders
+      <span id="selectedInfo" style="margin-left:8px;color:var(--blue-accent);display:none">· <strong id="selectedCount">0</strong> selected</span>
     </div>
+  </div>
+</div>
+
+<!-- ── Work orders table ── -->
+<div class="card">
+  {% if work_orders %}
+  <div class="table-wrap">
+    <table class="wo-table" id="woTable">
+      <thead>
+        <tr>
+          <th class="wo-col-check">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"
+                   title="Select all visible open orders" style="cursor:pointer">
+          </th>
+          <th class="wo-col-wo">WO No.</th>
+          <th class="wo-col-cust">Customer</th>
+          <th class="wo-col-prod">Product</th>
+          <th class="wo-col-spec">Size / Thick.</th>
+          <th class="wo-col-qty">Qty (kg)</th>
+          <th class="wo-col-prog">Progress</th>
+          <th class="wo-col-status">Status</th>
+          <th class="wo-col-date">Date</th>
+          <th class="wo-col-act">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="woTableBody">
+        {% for wo in work_orders %}
+        <tr class="wo-row"
+            data-status="{{ wo.status }}"
+            data-product="{{ wo.product_type }}"
+            data-customer="{{ wo.customer_name }}"
+            data-wo="{{ wo.wo_number }}"
+            data-id="{{ wo.id }}"
+            data-date="{{ wo.created_at.timestamp() | int }}"
+            data-progress="{{ wo.progress_pct }}"
+            data-weight="{{ wo.total_weight_kg }}">
+          <td class="wo-col-check" onclick="event.stopPropagation()">
+            {% if wo.status in ['open', 'in_production'] %}
+            <input type="checkbox" class="wo-checkbox"
+                   data-id="{{ wo.id }}" data-wo="{{ wo.wo_number }}"
+                   data-status="{{ wo.status }}"
+                   onchange="updateSelection()" style="cursor:pointer">
+            {% endif %}
+          </td>
+          <td class="wo-col-wo" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <strong style="color:var(--blue-primary)">{{ wo.wo_number }}</strong>
+          </td>
+          <td class="wo-col-cust" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <span class="wo-cell-wrap">{{ wo.customer_name }}</span>
+          </td>
+          <td class="wo-col-prod" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <span class="wo-cell-wrap">{{ wo.product_type }}</span>
+          </td>
+          <td class="wo-col-spec" style="cursor:pointer;white-space:nowrap" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            {{ wo.size_mm|int }}mm · {{ wo.thickness_microns|int }}µ
+          </td>
+          <td class="wo-col-qty num-cell" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            {{ wo.total_weight_kg|int }}
+          </td>
+          <td class="wo-col-prog" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="progress-bar-outer" style="flex:1;height:5px">
+                <div class="progress-bar-inner {% if wo.progress_pct >= 100 %}full{% endif %}"
+                     style="width:{{ wo.progress_pct }}%;height:5px"></div>
+              </div>
+              <span style="font-size:.7rem;color:var(--text-muted);white-space:nowrap">{{ wo.progress_pct }}%</span>
+            </div>
+          </td>
+          <td class="wo-col-status" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <span class="badge {{ wo.status_css }}">{{ wo.status_label }}</span>
+          </td>
+          <td class="wo-col-date" style="cursor:pointer;white-space:nowrap" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
+            <span class="text-muted" style="font-size:.78rem">{{ wo.created_at | fmt_date }}</span>
+          </td>
+          <td class="wo-col-act" onclick="event.stopPropagation()">
+            <div class="flex gap-1">
+              {% if wo.status == 'open' %}
+              <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" style="margin:0">
+                <input type="hidden" name="action" value="start_production">
+                <button type="submit" class="btn btn-outline btn-sm" title="Start production for this order">▶</button>
+              </form>
+              {% elif wo.status == 'in_production' %}
+              <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Rolls</a>
+              {% elif wo.status == 'ready' %}
+              <a href="{{ url_for('packing_list_index') }}" class="btn btn-outline btn-sm">Pack</a>
+              {% elif wo.status == 'dispatched' %}
+              <a href="{{ url_for('dm_index') }}" class="btn btn-outline btn-sm">DM</a>
+              {% endif %}
+              <a href="{{ url_for('work_order_detail', wo_id=wo.id) }}" class="btn btn-ghost btn-sm">View</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="noResults" style="display:none">
+    <div class="empty-state" style="padding:28px 24px">
+      <h3>No matching orders</h3>
+      <p>Try adjusting the filters or search term.</p>
+      <button class="btn btn-ghost mt-2" onclick="resetFilters()">Clear filters</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M9 12h6M9 16h6M17 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+    </svg>
+    <h3>No Work Orders Yet</h3>
+    <p>Create your first work order to get started.</p>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('work_order_new') }}" class="btn btn-primary mt-2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg> New Work Order</a>
     {% endif %}
   </div>
+  {% endif %}
+</div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+const allRows     = Array.from(document.querySelectorAll('.wo-row'));
+let currentStatus = '{{ active_filter }}';
+
+// ── Status filter ──────────────────────────────────────────────────────────
+function setStatusFilter(status) {
+  currentStatus = status;
+  document.querySelectorAll('.dash-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.status === status));
+  applyFilters();
+}
+
+// ── Master filter + sort ───────────────────────────────────────────────────
+function applyFilters() {
+  const sort     = document.getElementById('sortSelect')?.value     || 'date_desc';
+  const product  = document.getElementById('productFilter')?.value  || '';
+  const customer = document.getElementById('customerFilter')?.value || '';
+  const search   = (document.getElementById('searchInput')?.value   || '').toLowerCase().trim();
+
+  let visible = allRows.filter(row => {
+    if (currentStatus !== 'all' && row.dataset.status !== currentStatus) return false;
+    if (product  && row.dataset.product  !== product)  return false;
+    if (customer && row.dataset.customer !== customer) return false;
+    if (search) {
+      const hay = (row.dataset.wo + ' ' + row.dataset.customer + ' ' + row.dataset.product).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  visible.sort((a, b) => {
+    switch (sort) {
+      case 'date_desc':     return +b.dataset.date     - +a.dataset.date;
+      case 'date_asc':      return +a.dataset.date     - +b.dataset.date;
+      case 'wo_asc':        return a.dataset.wo.localeCompare(b.dataset.wo);
+      case 'wo_desc':       return b.dataset.wo.localeCompare(a.dataset.wo);
+      case 'customer_asc':  return a.dataset.customer.localeCompare(b.dataset.customer);
+      case 'progress_desc': return +b.dataset.progress - +a.dataset.progress;
+      case 'weight_desc':   return +b.dataset.weight   - +a.dataset.weight;
+    }
+    return 0;
+  });
+
+  const hidden = new Set(allRows.filter(r => !visible.includes(r)));
+  hidden.forEach(r => r.style.display = 'none');
+  const tbody = document.getElementById('woTableBody');
+  visible.forEach(r => { r.style.display = ''; tbody.appendChild(r); });
+
+  const countEl = document.getElementById('visibleCount');
+  if (countEl) countEl.textContent = visible.length;
+  const noRes = document.getElementById('noResults');
+  const table = document.getElementById('woTable');
+  if (noRes && table) {
+    noRes.style.display = visible.length === 0 ? 'block' : 'none';
+    table.style.display = visible.length === 0 ? 'none'  : '';
+  }
+
+  // Deselect hidden rows
+  hidden.forEach(r => {
+    const cb = r.querySelector('.wo-checkbox');
+    if (cb) cb.checked = false;
+  });
+  updateSelection();
+}
+
+function resetFilters() {
+  currentStatus = 'all';
+  document.querySelectorAll('.dash-pill').forEach(p =>
+    p.classList.toggle('active', p.dataset.status === 'all'));
+  ['sortSelect','productFilter','customerFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = id === 'sortSelect' ? 'date_desc' : '';
+  });
+  const si = document.getElementById('searchInput');
+  if (si) si.value = '';
+  applyFilters();
+}
+
+// ── Bulk selection ─────────────────────────────────────────────────────────
+function updateSelection() {
+  const checked   = Array.from(document.querySelectorAll('.wo-checkbox:checked'));
+  const count     = checked.length;
+  const openIds   = checked.filter(cb => cb.dataset.status === 'open').map(cb => cb.dataset.id);
+  const prodIds   = checked.filter(cb => cb.dataset.status === 'in_production').map(cb => cb.dataset.id);
+  const allIds    = checked.map(cb => cb.dataset.id).join(',');
+
+  // Populate both forms
+  document.getElementById('bulkStartIds').value = openIds.join(',');
+  document.getElementById('bulkUndoIds').value  = prodIds.join(',');
+  document.getElementById('bulkCount').textContent = count + ' selected';
+  document.getElementById('selectedCount').textContent = count;
+
+  const bulkBar  = document.getElementById('bulkBar');
+  const selInfo  = document.getElementById('selectedInfo');
+  const startBtn = document.getElementById('bulkStartBtn');
+  const undoBtn  = document.getElementById('bulkUndoBtn');
+
+  bulkBar.style.display  = count > 0 ? 'flex' : 'none';
+  selInfo.style.display  = count > 0 ? '' : 'none';
+  startBtn.disabled = openIds.length === 0;
+  undoBtn.disabled  = prodIds.length === 0;
+
+  // Update select-all checkbox state
+  const visibleCbs = Array.from(document.querySelectorAll('.wo-row:not([style*="display: none"]) .wo-checkbox'));
+  const selectAllCb = document.getElementById('selectAll');
+  if (selectAllCb && visibleCbs.length > 0) {
+    const checkedVis = visibleCbs.filter(cb => cb.checked);
+    selectAllCb.indeterminate = checkedVis.length > 0 && checkedVis.length < visibleCbs.length;
+    selectAllCb.checked = checkedVis.length === visibleCbs.length;
+  }
+}
+
+function toggleSelectAll(masterCb) {
+  // Only select visible open-WO checkboxes
+  const visible = Array.from(document.querySelectorAll('.wo-row:not([style*="display: none"]) .wo-checkbox'));
+  visible.forEach(cb => cb.checked = masterCb.checked);
+  updateSelection();
+}
+
+function clearSelection() {
+  document.querySelectorAll('.wo-checkbox').forEach(cb => cb.checked = false);
+  const sa = document.getElementById('selectAll');
+  if (sa) { sa.checked = false; sa.indeterminate = false; }
+  updateSelection();
+}
+
+// Initialise
+setStatusFilter('{{ active_filter }}');
+</script>
 {% endblock %}

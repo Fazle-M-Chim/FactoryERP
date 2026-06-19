@@ -119,7 +119,7 @@ login_manager.login_message_category = "error"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 # ─── CSRF PROTECTION ──────────────────────────────────────────────────────────
@@ -249,21 +249,82 @@ def logout():
 @login_required
 def dashboard():
     status_filter = request.args.get("status", "all")
-    query = WorkOrder.query.order_by(WorkOrder.created_at.desc())
-    if status_filter != "all":
-        query = query.filter_by(status=status_filter)
-    work_orders = query.all()
+    # Fetch all WOs — filtering/sorting is done client-side for instant response
+    work_orders = WorkOrder.query.order_by(WorkOrder.created_at.desc()).all()
     counts = {
-        "all":           WorkOrder.query.count(),
-        "open":          WorkOrder.query.filter_by(status="open").count(),
-        "in_production": WorkOrder.query.filter_by(status="in_production").count(),
-        "ready":         WorkOrder.query.filter_by(status="ready").count(),
-        "dispatched":    WorkOrder.query.filter_by(status="dispatched").count(),
+        "all":           len(work_orders),
+        "open":          sum(1 for w in work_orders if w.status == "open"),
+        "in_production": sum(1 for w in work_orders if w.status == "in_production"),
+        "ready":         sum(1 for w in work_orders if w.status == "ready"),
+        "dispatched":    sum(1 for w in work_orders if w.status == "dispatched"),
     }
+    # Product types and customers for filter dropdowns
+    product_types = sorted(set(w.product_type for w in work_orders if w.product_type))
+    customers     = sorted(set(w.customer_name for w in work_orders if w.customer_name))
+    from models import Recipe
+    recipes = Recipe.query.order_by(Recipe.name).all()
     g.dash_counts = counts
     g.dash_filter = status_filter
     return render_template("dashboard.html", work_orders=work_orders,
-                           counts=counts, active_filter=status_filter)
+                           counts=counts, active_filter=status_filter,
+                           product_types=product_types,
+                           customers=customers, recipes=recipes)
+
+
+@app.route("/bulk-start-production", methods=["POST"])
+@login_required
+@admin_required
+def bulk_start_production():
+    wo_ids_str = request.form.get("wo_ids", "").strip()
+    if not wo_ids_str:
+        flash("No work orders selected.", "error")
+        return redirect(url_for("dashboard"))
+    wo_ids = [int(x) for x in wo_ids_str.split(",") if x.strip().isdigit()]
+    started = []
+    skipped = []
+    for wo_id in wo_ids:
+        wo = db.session.get(WorkOrder, wo_id)
+        if not wo:
+            continue
+        if wo.status == "open":
+            wo.status = "in_production"
+            started.append(wo.wo_number)
+        else:
+            skipped.append(wo.wo_number)
+    if started:
+        db.session.commit()
+        flash(f"{len(started)} order(s) moved to In Production: {', '.join(started)}.", "success")
+    if skipped:
+        flash(f"{len(skipped)} order(s) skipped (not Open): {', '.join(skipped)}.", "info")
+    return redirect(url_for("dashboard", status="in_production"))
+
+
+@app.route("/bulk-undo-production", methods=["POST"])
+@login_required
+@admin_required
+def bulk_undo_production():
+    wo_ids_str = request.form.get("wo_ids", "").strip()
+    if not wo_ids_str:
+        flash("No work orders selected.", "error")
+        return redirect(url_for("dashboard"))
+    wo_ids = [int(x) for x in wo_ids_str.split(",") if x.strip().isdigit()]
+    undone = []
+    skipped = []
+    for wo_id in wo_ids:
+        wo = db.session.get(WorkOrder, wo_id)
+        if not wo:
+            continue
+        if wo.status == "in_production":
+            wo.status = "open"
+            undone.append(wo.wo_number)
+        else:
+            skipped.append(wo.wo_number)
+    if undone:
+        db.session.commit()
+        flash(f"{len(undone)} order(s) moved back to Open: {', '.join(undone)}.", "info")
+    if skipped:
+        flash(f"{len(skipped)} order(s) skipped (not In Production): {', '.join(skipped)}.", "info")
+    return redirect(url_for("dashboard", status="open"))
 
 
 # ─── USER MANAGEMENT (admin only) ─────────────────────────────────────────────
@@ -292,7 +353,7 @@ def users_manage():
                 flash(f"User '{username}' ({ROLES[role]}) created.", "success")
 
         elif action == "reset_password":
-            u = User.query.get_or_404(int(request.form.get("user_id", 0)))
+            u = db.get_or_404(User, int(request.form.get("user_id", 0)))
             new_pw = request.form.get("new_password", "").strip()
             if not new_pw:
                 flash("Password cannot be empty.", "error")
@@ -302,7 +363,7 @@ def users_manage():
                 flash(f"Password reset for '{u.username}'.", "success")
 
         elif action == "toggle":
-            u = User.query.get_or_404(int(request.form.get("user_id", 0)))
+            u = db.get_or_404(User, int(request.form.get("user_id", 0)))
             if u.id == current_user.id:
                 flash("Cannot disable your own account.", "error")
             else:
@@ -311,7 +372,7 @@ def users_manage():
                 flash(f"'{u.username}' {'enabled' if u.is_active else 'disabled'}.", "info")
 
         elif action == "delete":
-            u = User.query.get_or_404(int(request.form.get("user_id", 0)))
+            u = db.get_or_404(User, int(request.form.get("user_id", 0)))
             if u.id == current_user.id:
                 flash("Cannot delete your own account.", "error")
             else:
@@ -345,12 +406,12 @@ def product_types_manage():
                 db.session.commit()
                 flash(f"'{name}' added.", "success")
         elif action == "toggle":
-            pt = ProductType.query.get_or_404(int(request.form.get("pt_id", 0)))
+            pt = db.get_or_404(ProductType, int(request.form.get("pt_id", 0)))
             pt.is_active = not pt.is_active
             db.session.commit()
             flash(f"'{pt.name}' {'enabled' if pt.is_active else 'disabled'}.", "info")
         elif action == "delete":
-            pt = ProductType.query.get_or_404(int(request.form.get("pt_id", 0)))
+            pt = db.get_or_404(ProductType, int(request.form.get("pt_id", 0)))
             in_use = WorkOrder.query.filter_by(product_type=pt.name).count()
             if in_use:
                 flash(f"Cannot delete '{pt.name}' — used by {in_use} WO(s).", "error")
@@ -384,7 +445,7 @@ def customers_manage():
                 db.session.commit()
                 flash(f"Customer '{name}' added.", "success")
         elif action == "edit":
-            c = Customer.query.get_or_404(int(request.form.get("customer_id", 0)))
+            c = db.get_or_404(Customer, int(request.form.get("customer_id", 0)))
             new_name = request.form.get("name", "").strip()
             new_address = request.form.get("address", "").strip()
             if not new_name:
@@ -400,12 +461,12 @@ def customers_manage():
                 db.session.commit()
                 flash("Customer updated.", "success")
         elif action == "toggle":
-            c = Customer.query.get_or_404(int(request.form.get("customer_id", 0)))
+            c = db.get_or_404(Customer, int(request.form.get("customer_id", 0)))
             c.is_active = not c.is_active
             db.session.commit()
             flash(f"'{c.name}' {'enabled' if c.is_active else 'disabled'}.", "info")
         elif action == "delete":
-            c = Customer.query.get_or_404(int(request.form.get("customer_id", 0)))
+            c = db.get_or_404(Customer, int(request.form.get("customer_id", 0)))
             in_use = WorkOrder.query.filter_by(customer_id=c.id).count()
             if in_use:
                 flash(f"Cannot delete '{c.name}' — linked to {in_use} WO(s).", "error")
@@ -456,8 +517,8 @@ def work_order_new():
         thickness = parse_float(request.form.get("thickness_microns"), "Thickness", errors)
         target_kg = parse_float(request.form.get("total_weight_kg"), "Total order weight", errors)
 
-        cust = Customer.query.get(parse_int_id(customer_id)) if customer_id else None
-        recipe = Recipe.query.get(parse_int_id(recipe_id_str)) if recipe_id_str else None
+        cust = db.session.get(Customer, parse_int_id(customer_id)) if customer_id else None
+        recipe = db.session.get(Recipe, parse_int_id(recipe_id_str)) if recipe_id_str else None
 
         if errors:
             for e in errors:
@@ -518,7 +579,7 @@ def work_order_new():
 @app.route("/work-order/<int:wo_id>")
 @login_required
 def work_order_detail(wo_id):
-    wo = WorkOrder.query.get_or_404(wo_id)
+    wo = db.get_or_404(WorkOrder, wo_id)
     return render_template("work_order_detail.html", wo=wo)
 
 
@@ -526,7 +587,7 @@ def work_order_detail(wo_id):
 @login_required
 @admin_required
 def work_order_edit(wo_id):
-    wo = WorkOrder.query.get_or_404(wo_id)
+    wo = db.get_or_404(WorkOrder, wo_id)
     product_types = ProductType.active_names()
     if wo.product_type not in product_types:
         product_types = [wo.product_type] + product_types
@@ -534,12 +595,12 @@ def work_order_edit(wo_id):
     if wo.customer_id:
         cust_ids = [c.id for c in customers]
         if wo.customer_id not in cust_ids:
-            current_cust = Customer.query.get(wo.customer_id)
+            current_cust = db.session.get(Customer, wo.customer_id)
             if current_cust:
                 customers = [current_cust] + customers
     if request.method == "POST":
         customer_id = request.form.get("customer_id", "").strip()
-        cust = Customer.query.get(parse_int_id(customer_id)) if customer_id else None
+        cust = db.session.get(Customer, parse_int_id(customer_id)) if customer_id else None
 
         errors = []
         product_type = request.form.get("product_type", "").strip()
@@ -575,7 +636,7 @@ def work_order_edit(wo_id):
 @login_required
 @admin_required
 def work_order_delete(wo_id):
-    wo = WorkOrder.query.get_or_404(wo_id)
+    wo = db.get_or_404(WorkOrder, wo_id)
     db.session.delete(wo)
     db.session.commit()
     flash(f"Work Order {wo.wo_number} deleted.", "info")
@@ -587,7 +648,7 @@ def work_order_delete(wo_id):
 @app.route("/work-order/<int:wo_id>/production", methods=["GET", "POST"])
 @login_required
 def production(wo_id):
-    wo = WorkOrder.query.get_or_404(wo_id)
+    wo = db.get_or_404(WorkOrder, wo_id)
     if request.method == "POST":
         action = request.form.get("action", "add_roll")
 
@@ -641,10 +702,17 @@ def production(wo_id):
                 gross_weight_kg=gross, core_weight_kg=core, net_weight_kg=net,
             )
             db.session.add(roll)
-            if wo.status == "open":
-                wo.status = "in_production"
+            # Status only moves to in_production via explicit action,
+            # not automatically when a roll is added.
             db.session.commit()
             flash(f"Roll {roll.roll_no} added. Net: {net} kg", "success")
+
+        elif action == "start_production":
+            if wo.status == "open":
+                wo.status = "in_production"
+                db.session.commit()
+                flash(f"{wo.wo_number} moved to In Production.", "success")
+            return redirect(url_for("production", wo_id=wo.id))
 
         elif action == "mark_ready":
             if wo.roll_count == 0:
@@ -672,7 +740,7 @@ def production(wo_id):
 @login_required
 @require_permission("production_delete_roll")
 def roll_delete(roll_id):
-    roll = ProductionRoll.query.get_or_404(roll_id)
+    roll = db.get_or_404(ProductionRoll, roll_id)
     wo_id = roll.work_order_id
     db.session.delete(roll)
     db.session.commit()
@@ -684,7 +752,7 @@ def roll_delete(roll_id):
 @login_required
 @require_permission("production_edit_roll")
 def roll_edit(roll_id):
-    roll = ProductionRoll.query.get_or_404(roll_id)
+    roll = db.get_or_404(ProductionRoll, roll_id)
     errors = []
     roll_no = request.form.get("roll_no", roll.roll_no).strip()
     if not roll_no:
@@ -754,7 +822,7 @@ def packing_list_new():
         skipped = []
         for raw in wo_ids:
             wid = parse_int_id(raw)
-            wo = WorkOrder.query.get(wid) if wid is not None else None
+            wo = db.session.get(WorkOrder, wid) if wid is not None else None
             if not wo:
                 continue
             if wo.status != "ready" or wo.id in already_packed:
@@ -791,7 +859,7 @@ def packing_list_detail(pl_id):
     if current_user.role == "operator":
         flash("Operators cannot access packing lists.", "error")
         return redirect(url_for("dashboard"))
-    pl = PackingList.query.get_or_404(pl_id)
+    pl = db.get_or_404(PackingList, pl_id)
     return render_template("packing_list_detail.html", pl=pl,
                            today=date.today().strftime("%d.%m.%y"))
 
@@ -800,7 +868,7 @@ def packing_list_detail(pl_id):
 @login_required
 @require_permission("packing_list")
 def packing_list_remove_wo(pl_id):
-    pl = PackingList.query.get_or_404(pl_id)
+    pl = db.get_or_404(PackingList, pl_id)
     wo_id = parse_int_id(request.form.get("wo_id"))
     item = (PackingListItem.query.filter_by(packing_list_id=pl.id, work_order_id=wo_id).first()
             if wo_id is not None else None)
@@ -815,7 +883,7 @@ def packing_list_remove_wo(pl_id):
 @login_required
 @require_permission("packing_list")
 def packing_list_delete(pl_id):
-    pl = PackingList.query.get_or_404(pl_id)
+    pl = db.get_or_404(PackingList, pl_id)
     if pl.dispatch_memo:
         flash("Cannot delete — delete the Dispatch Memo first.", "error")
         return redirect(url_for("packing_list_detail", pl_id=pl.id))
@@ -854,7 +922,7 @@ def dm_new():
                         .order_by(PackingList.created_at.desc()).all())
     if request.method == "POST":
         pl_id = parse_int_id(request.form.get("packing_list_id"))
-        pl = PackingList.query.get_or_404(pl_id) if pl_id is not None else None
+        pl = db.get_or_404(PackingList, pl_id) if pl_id is not None else None
         if pl is None:
             flash("Please select a valid packing list.", "error")
             return redirect(url_for("dm_new"))
@@ -889,7 +957,7 @@ def dm_new():
         return redirect(url_for("dm_detail", dm_id=dm.id))
 
     preselect_pl_id = request.args.get("pl_id", type=int)
-    preselect_pl = PackingList.query.get(preselect_pl_id) if preselect_pl_id else None
+    preselect_pl = db.session.get(PackingList, preselect_pl_id) if preselect_pl_id else None
     return render_template("dm_new.html", undispatched_pls=undispatched_pls,
                            preselect_pl=preselect_pl, today=date.today().isoformat())
 
@@ -899,7 +967,7 @@ def dm_new():
 def dm_detail(dm_id):
     if current_user.role == "operator":
         abort(403)
-    dm = DispatchMemo.query.get_or_404(dm_id)
+    dm = db.get_or_404(DispatchMemo, dm_id)
     return render_template("dm_detail.html", dm=dm,
                            today=date.today().strftime("%d.%m.%y"))
 
@@ -908,7 +976,7 @@ def dm_detail(dm_id):
 @login_required
 @require_permission("dispatch_memo")
 def dm_edit(dm_id):
-    dm = DispatchMemo.query.get_or_404(dm_id)
+    dm = db.get_or_404(DispatchMemo, dm_id)
     if request.method == "POST":
         errors = []
         dispatch_date = parse_date(request.form.get("dispatch_date"), "Dispatch date", errors)
@@ -930,7 +998,7 @@ def dm_edit(dm_id):
 @login_required
 @require_permission("dispatch_memo")
 def dm_delete(dm_id):
-    dm = DispatchMemo.query.get_or_404(dm_id)
+    dm = db.get_or_404(DispatchMemo, dm_id)
     pl = dm.packing_list
     for wo in pl.work_orders:
         if wo.status == "dispatched":
@@ -1042,7 +1110,7 @@ def recipe_new():
 @login_required
 @admin_required
 def recipe_detail(recipe_id):
-    recipe = Recipe.query.get_or_404(recipe_id)
+    recipe = db.get_or_404(Recipe, recipe_id)
     return render_template("recipe_detail.html", recipe=recipe,
                            layer_names=LAYER_NAMES, max_grades=MAX_GRADES)
 
@@ -1051,7 +1119,7 @@ def recipe_detail(recipe_id):
 @login_required
 @admin_required
 def recipe_edit(recipe_id):
-    recipe = Recipe.query.get_or_404(recipe_id)
+    recipe = db.get_or_404(Recipe, recipe_id)
     product_types = ProductType.active_names()
     if recipe.product_type and recipe.product_type not in product_types:
         product_types = [recipe.product_type] + product_types
@@ -1130,7 +1198,7 @@ def recipe_edit(recipe_id):
 @login_required
 @admin_required
 def recipe_delete(recipe_id):
-    recipe = Recipe.query.get_or_404(recipe_id)
+    recipe = db.get_or_404(Recipe, recipe_id)
     name = recipe.name
     db.session.delete(recipe)
     db.session.commit()
@@ -1161,19 +1229,19 @@ def api_customer_address():
     cid = parse_int_id(request.args.get("id"))
     if cid is None:
         return jsonify({"address": ""})
-    cust = Customer.query.get(cid)
+    cust = db.session.get(Customer, cid)
     return jsonify({"address": cust.address if cust else ""})
 
 
 @app.route("/api/packing-list-info/<int:pl_id>")
 @login_required
 def api_pl_info(pl_id):
-    pl = PackingList.query.get_or_404(pl_id)
+    pl = db.get_or_404(PackingList, pl_id)
     wos = pl.work_orders
     customer_name = wos[0].customer_name if wos else ""
     customer_address = ""
     if wos and wos[0].customer_id:
-        cust = Customer.query.get(wos[0].customer_id)
+        cust = db.session.get(Customer, wos[0].customer_id)
         if cust:
             customer_address = cust.address
     return jsonify({
@@ -1318,7 +1386,7 @@ def inventory_adjust():
     mat_id = parse_int_id(request.form.get("material_id"))
     if mat_id is None:
         abort(404)
-    mat = RawMaterial.query.get_or_404(mat_id)
+    mat = db.get_or_404(RawMaterial, mat_id)
     qty_str = request.form.get("qty_kg", "").strip()
     try:
         qty = float(qty_str)
@@ -1345,7 +1413,7 @@ def inventory_ledger(material_id):
     """Full transaction history for one material."""
     if not _inventory_allowed():
         abort(403)
-    mat = RawMaterial.query.get_or_404(material_id)
+    mat = db.get_or_404(RawMaterial, material_id)
     entries = (InventoryLedger.query
                .filter_by(material_id=material_id)
                .order_by(InventoryLedger.created_at.desc())
@@ -1357,7 +1425,7 @@ def inventory_ledger(material_id):
 @login_required
 def api_recipe_material_preview(recipe_id):
     """Return material deduction preview for a given recipe + target kg."""
-    recipe = Recipe.query.get_or_404(recipe_id)
+    recipe = db.get_or_404(Recipe, recipe_id)
     try:
         target_kg = float(request.args.get("target_kg", 0) or 0)
     except (ValueError, TypeError):

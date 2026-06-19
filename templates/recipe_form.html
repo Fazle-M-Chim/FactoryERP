@@ -240,5 +240,47 @@ document.querySelectorAll('.pct-input').forEach(input => {
     targetInput.addEventListener('input', () => autoCalcAllKgForLayer(li));
   }
 });
+
+// ── Layer ratio → auto-adjust target kg ──────────────────────────────────
+// e.g. "1:1.3:1" with a base of 100kg → Inner=100, Middle=130, Outer=100
+function applyLayerRatio() {
+  const ratioInput = document.querySelector('[name="layer_ratio"]');
+  if (!ratioInput) return;
+  const raw = ratioInput.value.trim();
+  if (!raw) return;
+
+  // Parse ratio: split by : and convert to floats
+  const parts = raw.split(':').map(p => parseFloat(p.trim()));
+  if (parts.length !== 3 || parts.some(isNaN) || parts.some(p => p <= 0)) return;
+
+  // Use the first layer target_kg as the base unit
+  const baseInput = document.querySelector('[name="layer_0_target_kg"]');
+  const baseKg = parseFloat(baseInput?.value) || 100;
+  const baseRatio = parts[0]; // first part is the reference
+
+  parts.forEach((ratio, li) => {
+    const targetInput = document.querySelector(`[name="layer_${li}_target_kg"]`);
+    if (!targetInput) return;
+    const newTarget = Math.round((baseKg / baseRatio) * ratio * 10) / 10;
+    targetInput.value = newTarget;
+    autoCalcAllKgForLayer(li);
+  });
+}
+
+// Attach listener to layer_ratio field
+const ratioInput = document.querySelector('[name="layer_ratio"]');
+if (ratioInput) {
+  ratioInput.addEventListener('change', applyLayerRatio);
+  ratioInput.addEventListener('blur',   applyLayerRatio);
+}
+
+// Also run when base layer target_kg changes (recalculates others)
+const baseTargetInput = document.querySelector('[name="layer_0_target_kg"]');
+if (baseTargetInput) {
+  baseTargetInput.addEventListener('input', () => {
+    const ratioVal = document.querySelector('[name="layer_ratio"]')?.value;
+    if (ratioVal && ratioVal.includes(':')) applyLayerRatio();
+  });
+}
 </script>
 {% endblock %}
