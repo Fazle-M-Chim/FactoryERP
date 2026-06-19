@@ -59,8 +59,9 @@
         <div class="form-group">
           <label for="wo_number">WO Number <span class="required">*</span></label>
           {% if edit %}
-            <input type="text" id="wo_number" name="wo_number" value="{{ wo.wo_number }}" readonly />
-            <span class="form-hint">Cannot be changed after creation.</span>
+            <input type="text" id="wo_number" name="wo_number" value="{{ wo.wo_number }}"
+                   required autocomplete="off" />
+            <span class="form-hint">You can change the WO number — must be unique.</span>
           {% else %}
             <input type="text" id="wo_number" name="wo_number"
                    value="{{ form.wo_number if form.wo_number else next_wo }}"

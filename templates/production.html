@@ -34,10 +34,7 @@
   </div>
   <div class="page-header-actions">
     {% if wo.rolls and wo.status not in ['ready','dispatched'] %}
-    <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}">
-      <input type="hidden" name="action" value="mark_ready">
-      <button type="submit" class="btn btn-primary">Mark as Ready →</button>
-    </form>
+    <button type="button" class="btn btn-primary" onclick="openMarkReadyModal()">Mark as Ready →</button>
     {% elif wo.status == 'ready' %}
     <span class="badge status-packed" style="padding:7px 14px;font-size:.85rem">Ready for Packing</span>
     <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" style="margin-left:8px">
@@ -532,5 +529,44 @@ const rajuChecked   = document.querySelector('#rajuForm input[name="machine"]:ch
 const shubhamChecked = document.querySelector('#shubhamForm input[name="machine"]:checked');
 if (rajuChecked)   fetchNextRoll(rajuChecked.value,   document.getElementById('raju_roll_no'));
 if (shubhamChecked) fetchNextRoll(shubhamChecked.value, document.getElementById('shubham_roll_no'));
+
+// ── Mark as Ready confirmation modal ──────────────────────────────────────
+function openMarkReadyModal() {
+  document.getElementById('markReadyModal').style.display = 'flex';
+}
+function closeMarkReadyModal() {
+  document.getElementById('markReadyModal').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeMarkReadyModal();
+});
+document.getElementById('markReadyModal').addEventListener('click', function(e) {
+  if (e.target === this) closeMarkReadyModal();
+});
 </script>
+
+<!-- ── Mark as Ready confirmation modal ─────────────────────────────────── -->
+<div id="markReadyModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:32px 28px;width:420px;max-width:92vw;box-shadow:0 24px 64px rgba(0,0,0,.3)">
+    <h3 style="margin:0 0 6px">Mark as Ready?</h3>
+    <p style="font-size:.85rem;color:var(--text-muted);margin:0 0 20px">
+      {{ wo.wo_number }} &nbsp;·&nbsp; {{ wo.roll_count }} roll{{ 's' if wo.roll_count != 1 else '' }}
+      &nbsp;·&nbsp; {{ '%.2f'|format(wo.total_produced_kg) }} kg produced
+    </p>
+    <p style="font-size:.88rem;margin:0 0 24px">
+      This will move the order to <strong>Ready for Packing</strong>. Make sure all rolls have been logged.
+      You can undo this from the production page if needed.
+    </p>
+    <div style="display:flex;gap:10px">
+      <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" style="flex:1;margin:0">
+        <input type="hidden" name="action" value="mark_ready">
+        <button type="submit" class="btn btn-primary w-100">Yes, Mark as Ready</button>
+      </form>
+      <button type="button" class="btn btn-ghost" onclick="closeMarkReadyModal()"
+              style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

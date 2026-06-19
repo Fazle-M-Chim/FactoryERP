@@ -4,12 +4,16 @@
 {% block topbar_meta %}Work Order — {{ wo.customer_name }}{% endblock %}
 
 {% block topbar_actions %}
+  {% if current_user.role == 'admin' %}
   <a href="{{ url_for('work_order_edit', wo_id=wo.id) }}" class="btn btn-ghost btn-sm">Edit</a>
   {% if wo.status == 'open' %}
   <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}">
     <input type="hidden" name="action" value="start_production">
     <button type="submit" class="btn btn-primary btn-sm">Start Production →</button>
   </form>
+  {% else %}
+  <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary btn-sm">Production →</a>
+  {% endif %}
   {% else %}
   <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary btn-sm">Production →</a>
   {% endif %}
@@ -63,12 +67,16 @@
   </div>
   <div class="page-header-actions">
     <span class="badge {{ wo.status_css }}" style="font-size:.85rem; padding:6px 14px">{{ wo.status_label }}</span>
+    {% if current_user.role == 'admin' %}
     <a href="{{ url_for('work_order_edit', wo_id=wo.id) }}" class="btn btn-ghost">Edit</a>
     {% if wo.status == 'open' %}
     <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}">
       <input type="hidden" name="action" value="start_production">
       <button type="submit" class="btn btn-primary">Start Production →</button>
     </form>
+    {% else %}
+    <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary">View Production →</a>
+    {% endif %}
     {% else %}
     <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary">View Production →</a>
     {% endif %}
@@ -205,7 +213,7 @@
         <h3>Quick Actions</h3>
       </div>
       <div class="card-body" style="display:flex; flex-direction:column; gap:10px">
-        {% if wo.status == 'open' %}
+        {% if current_user.role == 'admin' and wo.status == 'open' %}
         <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}">
           <input type="hidden" name="action" value="start_production">
           <button type="submit" class="btn btn-primary w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/></svg> Start Production</button>
@@ -213,13 +221,17 @@
         {% else %}
         <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-primary w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3"/></svg> Log Rolls</a>
         {% endif %}
+        {% if current_user.role != 'operator' %}
         <a href="{{ url_for('packing_list_index') }}" class="btn btn-outline w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg> Packing Lists</a>
         <a href="{{ url_for('dm_index') }}" class="btn btn-outline w-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z"/></svg> Dispatch Memos</a>
+        {% endif %}
+        {% if current_user.role == 'admin' %}
         <div class="divider mt-0 mb-0"></div>
         <form method="POST" action="{{ url_for('work_order_delete', wo_id=wo.id) }}"
               onsubmit="return confirm('Delete this work order and ALL its data? This cannot be undone.')">
           <button type="submit" class="btn btn-danger w-100">Delete Work Order</button>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>

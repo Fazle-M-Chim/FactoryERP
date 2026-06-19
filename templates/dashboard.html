@@ -39,6 +39,7 @@
 <div class="card mb-3">
   <div class="card-body" style="padding:12px 16px">
     <div class="dash-filter-bar">
+      {% if current_user.role != 'operator' %}
       <div class="dash-filter-group">
         <label class="dash-filter-label">Status</label>
         <div class="dash-pills" id="statusPills">
@@ -49,6 +50,7 @@
           <button class="dash-pill"        data-status="dispatched"    onclick="setStatusFilter('dispatched')">Dispatched</button>
         </div>
       </div>
+      {% endif %}
       <div class="dash-filter-group">
         <label class="dash-filter-label">Sort</label>
         <select id="sortSelect" onchange="applyFilters()" class="dash-select">
@@ -93,7 +95,8 @@
       </div>
     </div>
 
-    <!-- Bulk action bar — shown when checkboxes selected -->
+    <!-- Bulk action bar — shown when checkboxes selected (admin only) -->
+    {% if current_user.role == 'admin' %}
     <div id="bulkBar" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--grey-100);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:.82rem;font-weight:600;color:var(--blue-primary)" id="bulkCount">0 selected</span>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -108,6 +111,7 @@
         <button type="button" class="btn btn-ghost btn-sm" onclick="clearSelection()">Clear</button>
       </div>
     </div>
+    {% endif %}
 
     <div style="font-size:.75rem;color:var(--text-muted);margin-top:8px">
       Showing <strong id="visibleCount">{{ work_orders|length }}</strong> of {{ work_orders|length }} orders
@@ -123,10 +127,12 @@
     <table class="wo-table" id="woTable">
       <thead>
         <tr>
+          {% if current_user.role == 'admin' %}
           <th class="wo-col-check">
             <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"
                    title="Select all visible open orders" style="cursor:pointer">
           </th>
+          {% endif %}
           <th class="wo-col-wo">WO No.</th>
           <th class="wo-col-cust">Customer</th>
           <th class="wo-col-prod">Product</th>
@@ -149,6 +155,7 @@
             data-date="{{ wo.created_at.timestamp() | int }}"
             data-progress="{{ wo.progress_pct }}"
             data-weight="{{ wo.total_weight_kg }}">
+          {% if current_user.role == 'admin' %}
           <td class="wo-col-check" onclick="event.stopPropagation()">
             {% if wo.status in ['open', 'in_production'] %}
             <input type="checkbox" class="wo-checkbox"
@@ -157,6 +164,7 @@
                    onchange="updateSelection()" style="cursor:pointer">
             {% endif %}
           </td>
+          {% endif %}
           <td class="wo-col-wo" style="cursor:pointer" onclick="window.location='{{ url_for('work_order_detail', wo_id=wo.id) }}'">
             <strong style="color:var(--blue-primary)">{{ wo.wo_number }}</strong>
           </td>
@@ -190,10 +198,12 @@
           <td class="wo-col-act" onclick="event.stopPropagation()">
             <div class="flex gap-1">
               {% if wo.status == 'open' %}
+              {% if current_user.role == 'admin' %}
               <form method="POST" action="{{ url_for('production', wo_id=wo.id) }}" style="margin:0">
                 <input type="hidden" name="action" value="start_production">
                 <button type="submit" class="btn btn-outline btn-sm" title="Start production for this order">▶</button>
               </form>
+              {% endif %}
               {% elif wo.status == 'in_production' %}
               <a href="{{ url_for('production', wo_id=wo.id) }}" class="btn btn-outline btn-sm">Rolls</a>
               {% elif wo.status == 'ready' %}
@@ -302,6 +312,7 @@ function resetFilters() {
   currentStatus = 'all';
   document.querySelectorAll('.dash-pill').forEach(p =>
     p.classList.toggle('active', p.dataset.status === 'all'));
+  // For operators the filter is locked server-side — nothing to reset
   ['sortSelect','productFilter','customerFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = id === 'sortSelect' ? 'date_desc' : '';
@@ -311,29 +322,33 @@ function resetFilters() {
   applyFilters();
 }
 
-// ── Bulk selection ─────────────────────────────────────────────────────────
+// ── Bulk selection (admin only — elements may not exist for other roles) ────
 function updateSelection() {
   const checked   = Array.from(document.querySelectorAll('.wo-checkbox:checked'));
   const count     = checked.length;
   const openIds   = checked.filter(cb => cb.dataset.status === 'open').map(cb => cb.dataset.id);
   const prodIds   = checked.filter(cb => cb.dataset.status === 'in_production').map(cb => cb.dataset.id);
-  const allIds    = checked.map(cb => cb.dataset.id).join(',');
-
-  // Populate both forms
-  document.getElementById('bulkStartIds').value = openIds.join(',');
-  document.getElementById('bulkUndoIds').value  = prodIds.join(',');
-  document.getElementById('bulkCount').textContent = count + ' selected';
-  document.getElementById('selectedCount').textContent = count;
 
   const bulkBar  = document.getElementById('bulkBar');
   const selInfo  = document.getElementById('selectedInfo');
   const startBtn = document.getElementById('bulkStartBtn');
   const undoBtn  = document.getElementById('bulkUndoBtn');
 
-  bulkBar.style.display  = count > 0 ? 'flex' : 'none';
-  selInfo.style.display  = count > 0 ? '' : 'none';
-  startBtn.disabled = openIds.length === 0;
-  undoBtn.disabled  = prodIds.length === 0;
+  // These elements only exist for admins
+  if (bulkBar) {
+    const startIdsEl = document.getElementById('bulkStartIds');
+    const undoIdsEl  = document.getElementById('bulkUndoIds');
+    const countEl    = document.getElementById('bulkCount');
+    const selCntEl   = document.getElementById('selectedCount');
+    if (startIdsEl) startIdsEl.value = openIds.join(',');
+    if (undoIdsEl)  undoIdsEl.value  = prodIds.join(',');
+    if (countEl)    countEl.textContent = count + ' selected';
+    if (selCntEl)   selCntEl.textContent = count;
+    bulkBar.style.display = count > 0 ? 'flex' : 'none';
+  }
+  if (selInfo)  selInfo.style.display  = count > 0 ? '' : 'none';
+  if (startBtn) startBtn.disabled = openIds.length === 0;
+  if (undoBtn)  undoBtn.disabled  = prodIds.length === 0;
 
   // Update select-all checkbox state
   const visibleCbs = Array.from(document.querySelectorAll('.wo-row:not([style*="display: none"]) .wo-checkbox'));

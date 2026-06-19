@@ -230,7 +230,12 @@ def login():
             session.permanent = True   # use PERMANENT_SESSION_LIFETIME
             login_user(user, remember=True)
             flash(f"Welcome, {user.username}.", "success")
-            return redirect(request.args.get("next") or url_for("dashboard"))
+            next_url = request.args.get("next")
+            if not next_url:
+                next_url = (url_for("dashboard", status="in_production")
+                            if user.role == "operator"
+                            else url_for("dashboard"))
+            return redirect(next_url)
         flash("Invalid username or password.", "error")
     return render_template("login.html")
 
@@ -248,9 +253,17 @@ def logout():
 @app.route("/")
 @login_required
 def dashboard():
-    status_filter = request.args.get("status", "all")
-    # Fetch all WOs — filtering/sorting is done client-side for instant response
-    work_orders = WorkOrder.query.order_by(WorkOrder.created_at.desc()).all()
+    # Operators are locked to the in-production view
+    if current_user.role == "operator":
+        status_filter = "in_production"
+        work_orders = (WorkOrder.query
+                       .filter_by(status="in_production")
+                       .order_by(WorkOrder.created_at.desc())
+                       .all())
+    else:
+        status_filter = request.args.get("status", "all")
+        # Fetch all WOs — filtering/sorting is done client-side for instant response
+        work_orders = WorkOrder.query.order_by(WorkOrder.created_at.desc()).all()
     counts = {
         "all":           len(work_orders),
         "open":          sum(1 for w in work_orders if w.status == "open"),
@@ -603,6 +616,13 @@ def work_order_edit(wo_id):
         cust = db.session.get(Customer, parse_int_id(customer_id)) if customer_id else None
 
         errors = []
+        new_wo_number = request.form.get("wo_number", "").strip()
+        if not new_wo_number:
+            errors.append("Work Order number is required.")
+        elif new_wo_number != wo.wo_number:
+            if WorkOrder.query.filter_by(wo_number=new_wo_number).first():
+                errors.append(f"Work Order number '{new_wo_number}' is already in use.")
+
         product_type = request.form.get("product_type", "").strip()
         if not product_type:
             errors.append("Product type is required.")
@@ -617,6 +637,7 @@ def work_order_edit(wo_id):
                                    customers=customers, next_wo=wo.wo_number,
                                    form=request.form, edit=True, wo=wo)
 
+        wo.wo_number = new_wo_number
         wo.product_type = product_type
         wo.customer_id = cust.id if cust else None
         wo.customer_name = cust.name if cust else ""
@@ -708,6 +729,9 @@ def production(wo_id):
             flash(f"Roll {roll.roll_no} added. Net: {net} kg", "success")
 
         elif action == "start_production":
+            if current_user.role != "admin":
+                flash("Only admins can move orders to production.", "error")
+                return redirect(url_for("production", wo_id=wo.id))
             if wo.status == "open":
                 wo.status = "in_production"
                 db.session.commit()
