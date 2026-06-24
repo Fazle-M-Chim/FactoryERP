@@ -507,6 +507,21 @@ class InventoryLedger(db.Model):
         return ""
 
 
+# ─── WORKERS (name list for attendance) ───────────────────────────────────────
+
+class Worker(db.Model):
+    """Named floor worker — used as a consistent picker in attendance logging."""
+    __tablename__ = "workers"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    name       = db.Column(db.String(100), nullable=False, unique=True)
+    is_active  = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Worker {self.name}>"
+
+
 # ─── ATTENDANCE PHOTOS ────────────────────────────────────────────────────────
 
 class AttendancePhoto(db.Model):

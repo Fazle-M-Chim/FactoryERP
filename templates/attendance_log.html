@@ -25,10 +25,21 @@
       <div class="card-header"><h3>Shift Details</h3></div>
       <div class="card-body">
         <div class="form-group mb-2">
-          <label for="worker_name">Worker Name(s) <span class="required">*</span></label>
-          <input type="text" id="worker_name" name="worker_name"
-                 placeholder="e.g. Raju, Shubham, Ali" autocomplete="off" required />
-          <span class="form-hint">One name or a short list of workers in this photo</span>
+          <label for="worker_name">Worker <span class="required">*</span></label>
+          {% if workers %}
+          <select id="worker_name" name="worker_name" required>
+            <option value="">— Select worker —</option>
+            {% for w in workers %}
+            <option value="{{ w.name }}">{{ w.name }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <div style="padding:10px 14px;border:1px dashed var(--grey-300);border-radius:var(--radius);color:var(--text-muted);font-size:.85rem">
+            No workers set up yet —
+            <a href="{{ url_for('workers_manage') }}" style="color:var(--blue-primary)">add workers</a> first.
+          </div>
+          <input type="hidden" name="worker_name" value="" />
+          {% endif %}
         </div>
         <div class="form-grid form-grid-2 mt-2">
           <div class="form-group">

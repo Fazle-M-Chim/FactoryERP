@@ -33,11 +33,20 @@
 <div class="card mb-3">
   <div class="card-body" style="padding:16px 24px">
     <form method="GET" action="{{ url_for('attendance_index') }}" class="attendance-filter-row">
-      <div class="form-group" style="flex:1;max-width:200px">
+      <div class="form-group" style="flex:1;max-width:190px">
+        <label for="worker">Worker</label>
+        <select id="worker" name="worker">
+          <option value="">All Workers</option>
+          {% for name in all_worker_names %}
+          <option value="{{ name }}" {% if worker_filter == name %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;max-width:190px">
         <label for="date">Date</label>
         <input type="date" id="date" name="date" value="{{ date_filter }}" />
       </div>
-      <div class="form-group" style="flex:1;max-width:180px">
+      <div class="form-group" style="flex:1;max-width:160px">
         <label for="shift">Shift</label>
         <select id="shift" name="shift">
           <option value="">All Shifts</option>
@@ -47,7 +56,7 @@
       </div>
       <div style="display:flex;align-items:flex-end;gap:8px">
         <button type="submit" class="btn btn-outline">Filter</button>
-        {% if date_filter or shift_filter %}
+        {% if date_filter or shift_filter or worker_filter %}
         <a href="{{ url_for('attendance_index') }}" class="btn btn-ghost">Clear</a>
         {% endif %}
       </div>

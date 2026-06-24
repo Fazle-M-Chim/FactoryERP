@@ -13,7 +13,7 @@ from models import (db, WorkOrder, ProductionRoll, ProductType, Customer,
                     PackingList, PackingListItem, DispatchMemo,
                     User, Recipe, RecipeLayer, RecipeGrade,
                     RawMaterial, InventoryLedger,
-                    AttendancePhoto, RollPhoto,
+                    AttendancePhoto, RollPhoto, Worker,
                     MACHINE_CHOICES, MACHINES, ROLES)
 
 app = Flask(__name__)
@@ -1532,14 +1532,56 @@ def serve_photo(folder, filename):
     return send_file(filepath, mimetype="image/jpeg")
 
 
+# ─── WORKERS ───────────────────────────────────────────────────────────────────
+
+@app.route("/workers", methods=["GET", "POST"])
+@login_required
+def workers_manage():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Worker name cannot be empty.", "error")
+        elif Worker.query.filter(db.func.lower(Worker.name) == name.lower()).first():
+            flash(f"A worker named '{name}' already exists.", "error")
+        else:
+            db.session.add(Worker(name=name))
+            db.session.commit()
+            flash(f"Worker '{name}' added.", "success")
+        return redirect(url_for("workers_manage"))
+
+    workers = Worker.query.order_by(Worker.name).all()
+    return render_template("workers.html", workers=workers)
+
+
+@app.route("/workers/<int:worker_id>/toggle", methods=["POST"])
+@login_required
+def worker_toggle(worker_id):
+    w = db.get_or_404(Worker, worker_id)
+    w.is_active = not w.is_active
+    db.session.commit()
+    flash(f"Worker '{w.name}' {'activated' if w.is_active else 'deactivated'}.", "success")
+    return redirect(url_for("workers_manage"))
+
+
+@app.route("/workers/<int:worker_id>/delete", methods=["POST"])
+@login_required
+def worker_delete(worker_id):
+    w = db.get_or_404(Worker, worker_id)
+    db.session.delete(w)
+    db.session.commit()
+    flash(f"Worker '{w.name}' deleted.", "success")
+    return redirect(url_for("workers_manage"))
+
+
 # ─── ATTENDANCE PHOTOS ─────────────────────────────────────────────────────────
 
 @app.route("/attendance")
 @login_required
 def attendance_index():
-    """Gallery of all attendance photos with date + shift filters."""
-    date_str  = request.args.get("date", "")
-    shift_str = request.args.get("shift", "")
+    """Gallery of all attendance photos with date, shift, and worker filters."""
+    date_str   = request.args.get("date", "")
+    shift_str  = request.args.get("shift", "")
+    worker_str = request.args.get("worker", "")
 
     q = AttendancePhoto.query
     if date_str:
@@ -1550,12 +1592,21 @@ def attendance_index():
             pass
     if shift_str:
         q = q.filter_by(shift=shift_str)
+    if worker_str:
+        q = q.filter_by(worker_name=worker_str)
 
     photos = q.order_by(AttendancePhoto.created_at.desc()).all()
     today  = date.today().strftime("%Y-%m-%d")
+
+    # All worker names that appear in records (for filter dropdown)
+    all_worker_names = sorted({p.worker_name for p in
+                                AttendancePhoto.query.with_entities(AttendancePhoto.worker_name).all()
+                                if p.worker_name})
     return render_template("attendance_index.html",
                            photos=photos, today=today,
-                           date_filter=date_str, shift_filter=shift_str)
+                           date_filter=date_str, shift_filter=shift_str,
+                           worker_filter=worker_str,
+                           all_worker_names=all_worker_names)
 
 
 @app.route("/attendance/log", methods=["GET", "POST"])
@@ -1605,9 +1656,10 @@ def attendance_log():
         flash(f"Attendance photo logged for {worker_name} ({shift} shift).", "success")
         return redirect(url_for("attendance_index"))
 
-    today = date.today().strftime("%Y-%m-%d")
+    today    = date.today().strftime("%Y-%m-%d")
+    workers  = Worker.query.filter_by(is_active=True).order_by(Worker.name).all()
     return render_template("attendance_log.html", today=today,
-                           shifts=AttendancePhoto.SHIFTS)
+                           shifts=AttendancePhoto.SHIFTS, workers=workers)
 
 
 @app.route("/attendance/<int:photo_id>/delete", methods=["POST"])
@@ -1636,12 +1688,18 @@ def roll_photo_add(roll_id):
         flash("You can only photograph rolls on in-production orders.", "error")
         return redirect(url_for("production", wo_id=roll.work_order_id))
 
-    photo_data = request.form.get("photo_data", "").strip()
-    notes      = request.form.get("notes", "").strip()
+    photo_data     = request.form.get("photo_data", "").strip()
+    notes          = request.form.get("notes", "").strip()
+    redirect_pl_id = request.form.get("redirect_pl_id", "").strip()
+
+    def _after_add():
+        if redirect_pl_id:
+            return redirect(url_for("packing_list_detail", pl_id=redirect_pl_id))
+        return redirect(url_for("production", wo_id=roll.work_order_id))
 
     if not photo_data:
         flash("No photo data received — please capture or upload a photo.", "error")
-        return redirect(url_for("production", wo_id=roll.work_order_id))
+        return _after_add()
 
     filename = _save_photo_b64(photo_data, "rolls")
     rp = RollPhoto(
@@ -1652,8 +1710,8 @@ def roll_photo_add(roll_id):
     )
     db.session.add(rp)
     db.session.commit()
-    flash(f"Photo added to roll {roll.roll_no}.", "success")
-    return redirect(url_for("production", wo_id=roll.work_order_id))
+    flash(f"Photo saved for roll {roll.roll_no}.", "success")
+    return _after_add()
 
 
 @app.route("/roll-photo/<int:photo_id>/delete", methods=["POST"])
@@ -1662,11 +1720,14 @@ def roll_photo_add(roll_id):
 def roll_photo_delete(photo_id):
     """Admin: delete a roll photo record and its file."""
     rp = db.get_or_404(RollPhoto, photo_id)
-    wo_id = rp.roll.work_order_id
+    wo_id          = rp.roll.work_order_id
+    redirect_pl_id = request.form.get("redirect_pl_id", "").strip()
     _delete_photo_file(rp.photo_filename, "rolls")
     db.session.delete(rp)
     db.session.commit()
     flash("Roll photo deleted.", "success")
+    if redirect_pl_id:
+        return redirect(url_for("packing_list_detail", pl_id=redirect_pl_id))
     return redirect(url_for("production", wo_id=wo_id))
 
 

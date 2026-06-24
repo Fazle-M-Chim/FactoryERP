@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Workers{% endblock %}
+{% block topbar_title %}Workers{% endblock %}
+{% block topbar_meta %}Floor worker name list for attendance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Workers</h2>
+    <p>{{ workers|length }} worker{{ 's' if workers|length != 1 else '' }} on record</p>
+  </div>
+</div>
+
+<div class="two-col-layout" style="grid-template-columns:1fr 2fr;max-width:860px;align-items:start">
+
+  <!-- Add worker form -->
+  <div class="card">
+    <div class="card-header"><h3>Add Worker</h3></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('workers_manage') }}">
+        <div class="form-group mb-3">
+          <label for="name">Full Name <span class="required">*</span></label>
+          <input type="text" id="name" name="name" placeholder="e.g. Raju Kumar"
+                 autocomplete="off" required autofocus />
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Add Worker</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Worker list -->
+  <div class="card">
+    <div class="card-header"><h3>Worker List</h3></div>
+    {% if workers %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th style="text-align:center">Status</th>
+            <th style="text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in workers %}
+          <tr>
+            <td>
+              <strong style="{% if not w.is_active %}color:var(--text-muted);{% endif %}">{{ w.name }}</strong>
+            </td>
+            <td style="text-align:center">
+              {% if w.is_active %}
+              <span class="badge badge-success" style="font-size:.72rem">Active</span>
+              {% else %}
+              <span class="badge" style="background:var(--grey-100);color:var(--text-muted);font-size:.72rem;padding:2px 8px;border-radius:12px">Inactive</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right">
+              <div class="flex gap-1" style="justify-content:flex-end">
+                <form method="POST" action="{{ url_for('worker_toggle', worker_id=w.id) }}" style="margin:0">
+                  <button type="submit" class="btn btn-ghost btn-sm">
+                    {{ 'Deactivate' if w.is_active else 'Activate' }}
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('worker_delete', worker_id=w.id) }}" style="margin:0"
+                      onsubmit="return confirm('Delete {{ w.name }}? This will not affect existing attendance records.')">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+      <p style="color:var(--text-muted);text-align:center;padding:16px 0">No workers yet — add one above.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
