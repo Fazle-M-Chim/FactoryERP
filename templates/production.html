@@ -190,6 +190,16 @@
               <td class="num-cell net-cell" style="font-weight:600;color:var(--blue-primary)">{{ '%.3f'|format(roll.net_weight_kg) }}</td>
               <td class="actions-cell">
                 <div class="flex gap-1">
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          onclick="openRollPhotoModal({{ roll.id }}, '{{ roll.roll_no }}')"
+                          title="{% if roll.photos %}{{ roll.photos|length }} photo(s) — click to view or add{% else %}Add photo for this roll{% endif %}"
+                          style="display:inline-flex;align-items:center;gap:3px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex-shrink:0">
+                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    {% if roll.photos %}<span style="font-size:.72rem;font-weight:700;color:var(--blue-primary)">{{ roll.photos|length }}</span>{% endif %}
+                  </button>
                   <button type="button" class="btn btn-outline btn-sm" onclick="openEdit({{ roll.id }})">Edit</button>
                   <form method="POST" action="{{ url_for('roll_delete', roll_id=roll.id) }}" style="margin:0">
                     <button type="submit" class="btn btn-danger btn-sm"
@@ -385,6 +395,16 @@
               <td class="num-cell net-cell" style="font-weight:600;color:var(--blue-primary)">{{ '%.3f'|format(roll.net_weight_kg) }}</td>
               <td class="actions-cell">
                 <div class="flex gap-1">
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          onclick="openRollPhotoModal({{ roll.id }}, '{{ roll.roll_no }}')"
+                          title="{% if roll.photos %}{{ roll.photos|length }} photo(s) — click to view or add{% else %}Add photo for this roll{% endif %}"
+                          style="display:inline-flex;align-items:center;gap:3px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex-shrink:0">
+                      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    {% if roll.photos %}<span style="font-size:.72rem;font-weight:700;color:var(--blue-primary)">{{ roll.photos|length }}</span>{% endif %}
+                  </button>
                   <button type="button" class="btn btn-outline btn-sm" onclick="openEdit({{ roll.id }})">Edit</button>
                   <form method="POST" action="{{ url_for('roll_delete', roll_id=roll.id) }}" style="margin:0">
                     <button type="submit" class="btn btn-danger btn-sm"
@@ -542,6 +562,335 @@ document.addEventListener('keydown', function(e) {
 });
 document.getElementById('markReadyModal').addEventListener('click', function(e) {
   if (e.target === this) closeMarkReadyModal();
+});
+</script>
+
+<!-- ── Roll Photos Modal ─────────────────────────────────────────────────── -->
+<div id="rollPhotoModal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;width:min(540px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);display:flex;flex-direction:column">
+
+    <!-- Modal header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--grey-100);position:sticky;top:0;background:#fff;z-index:1">
+      <div>
+        <h3 id="rollPhotoTitle" style="margin:0;font-size:1rem;font-weight:700">Roll Photos</h3>
+        <p id="rollPhotoSub" style="margin:0;font-size:.8rem;color:var(--text-muted)"></p>
+      </div>
+      <button onclick="closeRollPhotoModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted);padding:0 4px">×</button>
+    </div>
+
+    <!-- Existing photos section -->
+    <div id="existingPhotosSection" style="padding:16px 20px;border-bottom:1px solid var(--grey-100);display:none">
+      <p style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0 0 10px">Existing Photos</p>
+      <div id="existingPhotosList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+
+    <!-- Add new photo section -->
+    <div style="padding:16px 20px">
+      <p style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0 0 12px">Add Photo</p>
+
+      <form id="rollPhotoForm" method="POST" action="">
+        <input type="hidden" name="photo_data" id="rollPhotoData" />
+
+        <!-- Preview -->
+        <div id="rollPreviewArea" style="min-height:140px;background:var(--grey-50);border:1px dashed var(--grey-200);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;position:relative">
+          <div id="rollPreviewPlaceholder" style="text-align:center;color:var(--text-muted);padding:20px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;margin:0 auto 6px;display:block;color:var(--grey-200)">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <p style="font-size:.8rem;margin:0">No photo yet</p>
+          </div>
+          <img id="rollPreviewImg" src="" alt="" style="display:none;max-width:100%;max-height:220px;object-fit:contain" />
+        </div>
+
+        <!-- Capture / Upload buttons -->
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openRollCamera()" id="rollCameraBtn" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg> Open Camera
+          </button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;flex:1;justify-content:center;display:inline-flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg> Upload File
+            <input type="file" id="rollFileInput" accept="image/*" style="display:none" onchange="loadRollFile(this)" />
+          </label>
+          <button type="button" id="rollRetakeBtn" class="btn btn-ghost btn-sm" onclick="clearRollPhoto()" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+              <path d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/>
+            </svg> Retake
+          </button>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group mb-3">
+          <label for="rollPhotoNotes" style="font-size:.78rem">Notes (optional)</label>
+          <input type="text" id="rollPhotoNotes" name="notes" placeholder="e.g. Front view, dispatch ready" style="font-size:.85rem" />
+        </div>
+
+        <button type="submit" id="rollPhotoSubmit" class="btn btn-primary w-100" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12l5 5L20 7"/>
+          </svg> Save Photo
+        </button>
+        <p id="rollPhotoHint" style="font-size:.75rem;color:var(--text-muted);text-align:center;margin:6px 0 0">Capture or upload a photo first</p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Roll Camera Overlay ──────────────────────────────────────────────────── -->
+<div id="rollCameraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:600;align-items:center;justify-content:center">
+  <div style="background:#111;border-radius:12px;overflow:hidden;width:min(480px,94vw)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#000">
+      <span style="color:#fff;font-weight:600;font-size:.9rem">Camera — Roll Photo</span>
+      <button onclick="closeRollCamera()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1;padding:0 4px">×</button>
+    </div>
+    <video id="rollCameraVideo" autoplay playsinline muted style="width:100%;display:block;max-height:340px;object-fit:cover"></video>
+    <canvas id="rollCameraCanvas" style="display:none"></canvas>
+    <div style="padding:16px;background:#111;display:flex;justify-content:center">
+      <button onclick="captureRollPhoto()"
+              style="width:60px;height:60px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.15);cursor:pointer;transition:background .15s"
+              onmouseover="this.style.background='rgba(255,255,255,.3)'"
+              onmouseout="this.style.background='rgba(255,255,255,.15)'">
+        <svg viewBox="0 0 24 24" fill="white" stroke="none" style="width:28px;height:28px"><circle cx="12" cy="12" r="8"/></svg>
+      </button>
+    </div>
+    <p style="text-align:center;color:rgba(255,255,255,.5);font-size:.8rem;padding-bottom:14px;margin:0">Tap to capture</p>
+  </div>
+</div>
+
+<!-- ── Lightbox (roll photo view) ──────────────────────────────────────────── -->
+<div id="rollLightbox" class="lightbox-backdrop" onclick="closeRollLightbox()" style="display:none">
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <button class="lightbox-close" onclick="closeRollLightbox()">×</button>
+    <img id="rollLightboxImg" src="" alt="" class="lightbox-img" />
+    <div id="rollLightboxCaption" class="lightbox-caption"></div>
+  </div>
+</div>
+
+<!-- Roll photos JSON data — keyed by roll ID -->
+<script>
+const rollPhotosData = {
+  {% for roll in rolls %}
+  "{{ roll.id }}": {
+    rollNo: {{ roll.roll_no | tojson }},
+    addUrl: "{{ url_for('roll_photo_add', roll_id=roll.id) }}",
+    photos: [{% for p in roll.photos %}{
+      id: {{ p.id }},
+      url: {{ url_for('serve_photo', folder='rolls', filename=p.photo_filename) | tojson }},
+      notes: {{ p.notes | tojson }},
+      takenBy: {{ p.taken_by | tojson }},
+      createdAt: {{ p.created_at | ist | tojson }},
+      deleteUrl: {{ url_for('roll_photo_delete', photo_id=p.id) | tojson }},
+      isAdmin: {{ (current_user.role == 'admin') | tojson }}
+    }{% if not loop.last %},{% endif %}{% endfor %}]
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+let rollStream = null;
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+// Detect camera support (requires HTTPS / secure context)
+const rollCameraSupported = !!(window.isSecureContext &&
+                                navigator.mediaDevices &&
+                                navigator.mediaDevices.getUserMedia);
+
+// Hide camera button on HTTP / unsupported browsers
+if (!rollCameraSupported) {
+  const btn = document.getElementById('rollCameraBtn');
+  if (btn) { btn.style.display = 'none'; }
+  const hint = document.getElementById('rollPhotoHint');
+  if (hint) { hint.textContent = 'Camera requires HTTPS — use Upload File below'; }
+}
+
+function openRollPhotoModal(rollId, rollNo) {
+  const data = rollPhotosData[String(rollId)];
+  if (!data) return;
+
+  // Set header
+  document.getElementById('rollPhotoTitle').textContent = 'Photos — ' + rollNo;
+  document.getElementById('rollPhotoSub').textContent = data.photos.length
+    ? data.photos.length + ' existing photo' + (data.photos.length > 1 ? 's' : '')
+    : 'No photos yet';
+
+  // Set form action
+  document.getElementById('rollPhotoForm').action = data.addUrl;
+
+  // Reset new-photo form
+  clearRollPhoto();
+  document.getElementById('rollPhotoNotes').value = '';
+
+  // Render existing photos
+  const section = document.getElementById('existingPhotosSection');
+  const list    = document.getElementById('existingPhotosList');
+  list.innerHTML = '';
+  if (data.photos.length > 0) {
+    section.style.display = 'block';
+    data.photos.forEach(function(p) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block';
+
+      const img = document.createElement('img');
+      img.src = p.url;
+      img.alt = 'Roll photo';
+      img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid var(--grey-200)';
+      img.onclick = function() { openRollLightbox(p.url, rollNo + (p.notes ? ' — ' + p.notes : '') + ' · by ' + p.takenBy); };
+      wrap.appendChild(img);
+
+      if (p.isAdmin) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.title = 'Delete photo';
+        del.style.cssText = 'position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--danger);color:#fff;border:none;cursor:pointer;font-size:.85rem;line-height:1;display:flex;align-items:center;justify-content:center;padding:0';
+        del.textContent = '×';
+        del.onclick = function() {
+          if (!confirm('Delete this roll photo?')) return;
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = p.deleteUrl;
+          const csrf = document.createElement('input');
+          csrf.type = 'hidden'; csrf.name = '_csrf_token'; csrf.value = csrfToken;
+          form.appendChild(csrf);
+          document.body.appendChild(form);
+          form.submit();
+        };
+        wrap.appendChild(del);
+      }
+
+      const meta = document.createElement('div');
+      meta.style.cssText = 'font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:3px;max-width:80px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
+      meta.title = p.notes || p.takenBy;
+      meta.textContent = p.notes || p.takenBy;
+      wrap.appendChild(meta);
+
+      list.appendChild(wrap);
+    });
+  } else {
+    section.style.display = 'none';
+  }
+
+  document.getElementById('rollPhotoModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeRollPhotoModal() {
+  closeRollCamera();
+  document.getElementById('rollPhotoModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function clearRollPhoto() {
+  document.getElementById('rollPhotoData').value = '';
+  document.getElementById('rollPreviewImg').src = '';
+  document.getElementById('rollPreviewImg').style.display = 'none';
+  document.getElementById('rollPreviewPlaceholder').style.display = 'flex';
+  document.getElementById('rollRetakeBtn').style.display = 'none';
+  document.getElementById('rollPhotoSubmit').disabled = true;
+  document.getElementById('rollPhotoHint').textContent = 'Capture or upload a photo first';
+}
+
+function setRollPhoto(dataUrl) {
+  document.getElementById('rollPhotoData').value = dataUrl;
+  const img = document.getElementById('rollPreviewImg');
+  img.src = dataUrl;
+  img.style.display = 'block';
+  document.getElementById('rollPreviewPlaceholder').style.display = 'none';
+  document.getElementById('rollRetakeBtn').style.display = '';
+  document.getElementById('rollPhotoSubmit').disabled = false;
+  document.getElementById('rollPhotoHint').textContent = 'Photo ready — add notes (optional) and save';
+}
+
+/* Camera for roll photo */
+async function openRollCamera() {
+  if (!rollCameraSupported) {
+    showRollCameraNote('Camera requires HTTPS — please use Upload File instead.');
+    return;
+  }
+  const modal = document.getElementById('rollCameraModal');
+  modal.style.display = 'flex';
+  const video = document.getElementById('rollCameraVideo');
+  try {
+    rollStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = rollStream;
+  } catch(err) {
+    closeRollCamera();
+    showRollCameraNote('Camera access denied — please use Upload File instead.');
+  }
+}
+
+function showRollCameraNote(msg) {
+  const hint = document.getElementById('rollPhotoHint');
+  if (hint) { hint.textContent = msg; hint.style.color = 'var(--warning)'; }
+}
+
+function captureRollPhoto() {
+  const video  = document.getElementById('rollCameraVideo');
+  const canvas = document.getElementById('rollCameraCanvas');
+  const maxW = 1024;
+  let w = video.videoWidth, h = video.videoHeight;
+  if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  closeRollCamera();
+  setRollPhoto(dataUrl);
+}
+
+function closeRollCamera() {
+  if (rollStream) { rollStream.getTracks().forEach(t => t.stop()); rollStream = null; }
+  document.getElementById('rollCameraModal').style.display = 'none';
+}
+
+function loadRollFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const maxW = 1024;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      setRollPhoto(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+/* Roll photo lightbox */
+function openRollLightbox(src, caption) {
+  document.getElementById('rollLightboxImg').src = src;
+  document.getElementById('rollLightboxCaption').textContent = caption;
+  document.getElementById('rollLightbox').style.display = 'flex';
+}
+function closeRollLightbox() {
+  document.getElementById('rollLightbox').style.display = 'none';
+  document.getElementById('rollLightboxImg').src = '';
+}
+
+/* Escape key handling */
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeRollCamera();
+    closeRollPhotoModal();
+    closeRollLightbox();
+  }
+});
+/* Click-outside roll photo modal */
+document.getElementById('rollPhotoModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRollPhotoModal();
 });
 </script>
 

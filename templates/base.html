@@ -98,6 +98,16 @@
       </div>
       {% endif %}
 
+      <!-- Attendance Photos — all users -->
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('attendance_index') }}"
+         class="nav-link {% if request.endpoint in ['attendance_index','attendance_log'] %}active{% endif %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg> Attendance</a>
+      {% endif %}
+
       <!-- Packing Lists — supervisor + admin -->
       {% if current_user.is_authenticated and current_user.role in ['admin','supervisor'] %}
       <a href="{{ url_for('packing_list_index') }}"

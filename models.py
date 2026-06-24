@@ -505,3 +505,38 @@ class InventoryLedger(db.Model):
             if wo:
                 return wo.customer_name
         return ""
+
+
+# ─── ATTENDANCE PHOTOS ────────────────────────────────────────────────────────
+
+class AttendancePhoto(db.Model):
+    """Daily shift attendance photo — one record per photo taken at shift start."""
+    __tablename__ = "attendance_photos"
+
+    id          = db.Column(db.Integer, primary_key=True)
+    worker_name = db.Column(db.String(100), nullable=False)
+    shift       = db.Column(db.String(20),  nullable=False)   # Morning / Evening / Night
+    shift_date  = db.Column(db.Date,        nullable=False)
+    photo_filename = db.Column(db.String(200), nullable=False)
+    notes       = db.Column(db.Text, default="")
+    taken_by    = db.Column(db.String(80),  nullable=False)   # username
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    SHIFTS = ["Morning", "Evening"]
+
+
+# ─── ROLL PHOTOS ──────────────────────────────────────────────────────────────
+
+class RollPhoto(db.Model):
+    """Photo of a production roll, typically taken before dispatch."""
+    __tablename__ = "roll_photos"
+
+    id             = db.Column(db.Integer, primary_key=True)
+    roll_id        = db.Column(db.Integer, db.ForeignKey("production_rolls.id"),
+                               nullable=False)
+    photo_filename = db.Column(db.String(200), nullable=False)
+    notes          = db.Column(db.Text, default="")
+    taken_by       = db.Column(db.String(80), nullable=False)  # username
+    created_at     = db.Column(db.DateTime, default=datetime.utcnow)
+
+    roll = db.relationship("ProductionRoll", backref="photos", lazy=True)

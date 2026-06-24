@@ -1,16 +1,19 @@
 import os
 import secrets
+import base64
+import uuid
 from datetime import datetime, date, timezone, timedelta
 
 IST = timezone(timedelta(hours=5, minutes=30))
 from flask import (Flask, render_template, request, redirect, url_for,
-                   flash, jsonify, g, abort, session)
+                   flash, jsonify, g, abort, session, send_file)
 from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
 from models import (db, WorkOrder, ProductionRoll, ProductType, Customer,
                     PackingList, PackingListItem, DispatchMemo,
                     User, Recipe, RecipeLayer, RecipeGrade,
                     RawMaterial, InventoryLedger,
+                    AttendancePhoto, RollPhoto,
                     MACHINE_CHOICES, MACHINES, ROLES)
 
 app = Flask(__name__)
@@ -1479,6 +1482,192 @@ def api_recipe_material_preview(recipe_id):
         "recipe_batch_kg": batch_kg,
         "target_kg": target_kg,
     })
+
+
+# ─── PHOTO UTILITIES ──────────────────────────────────────────────────────────
+
+def _photos_dir(subfolder: str) -> str:
+    """Return (and create if needed) the directory for a photo subfolder."""
+    base = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH",
+                          os.path.join(os.path.abspath(os.path.dirname(__file__)), "instance"))
+    path = os.path.join(base, "photos", subfolder)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _save_photo_b64(data_url: str, subfolder: str) -> str:
+    """Decode a base64 data-URL photo and save it to disk. Returns filename."""
+    if "," in data_url:
+        data_url = data_url.split(",", 1)[1]
+    raw = base64.b64decode(data_url)
+    filename = f"{uuid.uuid4().hex}.jpg"
+    filepath = os.path.join(_photos_dir(subfolder), filename)
+    with open(filepath, "wb") as fh:
+        fh.write(raw)
+    return filename
+
+
+def _delete_photo_file(filename: str, subfolder: str):
+    """Remove a photo file from disk. Silently ignores missing files."""
+    filepath = os.path.join(_photos_dir(subfolder), filename)
+    try:
+        os.remove(filepath)
+    except OSError:
+        pass
+
+
+# ─── PHOTO FILE SERVING ────────────────────────────────────────────────────────
+
+@app.route("/uploads/<folder>/<filename>")
+@login_required
+def serve_photo(folder, filename):
+    """Serve uploaded photos. Only two sub-folders are allowed."""
+    if folder not in ("attendance", "rolls"):
+        abort(404)
+    filename = os.path.basename(filename)   # prevent path traversal
+    directory = _photos_dir(folder)
+    filepath = os.path.join(directory, filename)
+    if not os.path.isfile(filepath):
+        abort(404)
+    return send_file(filepath, mimetype="image/jpeg")
+
+
+# ─── ATTENDANCE PHOTOS ─────────────────────────────────────────────────────────
+
+@app.route("/attendance")
+@login_required
+def attendance_index():
+    """Gallery of all attendance photos with date + shift filters."""
+    date_str  = request.args.get("date", "")
+    shift_str = request.args.get("shift", "")
+
+    q = AttendancePhoto.query
+    if date_str:
+        try:
+            filter_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            q = q.filter_by(shift_date=filter_date)
+        except ValueError:
+            pass
+    if shift_str:
+        q = q.filter_by(shift=shift_str)
+
+    photos = q.order_by(AttendancePhoto.created_at.desc()).all()
+    today  = date.today().strftime("%Y-%m-%d")
+    return render_template("attendance_index.html",
+                           photos=photos, today=today,
+                           date_filter=date_str, shift_filter=shift_str)
+
+
+@app.route("/attendance/log", methods=["GET", "POST"])
+@login_required
+def attendance_log():
+    """Log a new attendance photo."""
+    if request.method == "POST":
+        worker_name = request.form.get("worker_name", "").strip()
+        shift       = request.form.get("shift", "").strip()
+        shift_date_str = request.form.get("shift_date", "").strip()
+        notes       = request.form.get("notes", "").strip()
+        photo_data  = request.form.get("photo_data", "").strip()
+
+        errors = []
+        if not worker_name:
+            errors.append("Worker name is required.")
+        if shift not in AttendancePhoto.SHIFTS:
+            errors.append("Please select a valid shift.")
+        if not shift_date_str:
+            errors.append("Shift date is required.")
+        if not photo_data:
+            errors.append("A photo is required — please capture or upload one.")
+
+        shift_date_val = None
+        if shift_date_str:
+            try:
+                shift_date_val = datetime.strptime(shift_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                errors.append("Invalid date format.")
+
+        if errors:
+            for e in errors:
+                flash(e, "error")
+            return redirect(url_for("attendance_log"))
+
+        filename = _save_photo_b64(photo_data, "attendance")
+        photo = AttendancePhoto(
+            worker_name    = worker_name,
+            shift          = shift,
+            shift_date     = shift_date_val,
+            photo_filename = filename,
+            notes          = notes,
+            taken_by       = current_user.username,
+        )
+        db.session.add(photo)
+        db.session.commit()
+        flash(f"Attendance photo logged for {worker_name} ({shift} shift).", "success")
+        return redirect(url_for("attendance_index"))
+
+    today = date.today().strftime("%Y-%m-%d")
+    return render_template("attendance_log.html", today=today,
+                           shifts=AttendancePhoto.SHIFTS)
+
+
+@app.route("/attendance/<int:photo_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def attendance_delete(photo_id):
+    """Admin: delete an attendance photo record and its file."""
+    photo = db.get_or_404(AttendancePhoto, photo_id)
+    _delete_photo_file(photo.photo_filename, "attendance")
+    db.session.delete(photo)
+    db.session.commit()
+    flash("Attendance record deleted.", "success")
+    return redirect(url_for("attendance_index"))
+
+
+# ─── ROLL PHOTOS ───────────────────────────────────────────────────────────────
+
+@app.route("/roll/<int:roll_id>/photo/add", methods=["POST"])
+@login_required
+def roll_photo_add(roll_id):
+    """Add a photo to a production roll."""
+    roll = db.get_or_404(ProductionRoll, roll_id)
+
+    # Permission: operator can only photo rolls on their own in-production WO
+    if current_user.role == "operator" and roll.work_order.status != "in_production":
+        flash("You can only photograph rolls on in-production orders.", "error")
+        return redirect(url_for("production", wo_id=roll.work_order_id))
+
+    photo_data = request.form.get("photo_data", "").strip()
+    notes      = request.form.get("notes", "").strip()
+
+    if not photo_data:
+        flash("No photo data received — please capture or upload a photo.", "error")
+        return redirect(url_for("production", wo_id=roll.work_order_id))
+
+    filename = _save_photo_b64(photo_data, "rolls")
+    rp = RollPhoto(
+        roll_id        = roll.id,
+        photo_filename = filename,
+        notes          = notes,
+        taken_by       = current_user.username,
+    )
+    db.session.add(rp)
+    db.session.commit()
+    flash(f"Photo added to roll {roll.roll_no}.", "success")
+    return redirect(url_for("production", wo_id=roll.work_order_id))
+
+
+@app.route("/roll-photo/<int:photo_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+def roll_photo_delete(photo_id):
+    """Admin: delete a roll photo record and its file."""
+    rp = db.get_or_404(RollPhoto, photo_id)
+    wo_id = rp.roll.work_order_id
+    _delete_photo_file(rp.photo_filename, "rolls")
+    db.session.delete(rp)
+    db.session.commit()
+    flash("Roll photo deleted.", "success")
+    return redirect(url_for("production", wo_id=wo_id))
 
 
 if __name__ == "__main__":

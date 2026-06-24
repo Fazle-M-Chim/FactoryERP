@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Log Attendance{% endblock %}
+{% block topbar_title %}Log Attendance{% endblock %}
+{% block topbar_meta %}Capture a shift attendance photo{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Log Attendance</h2>
+    <p>Take or upload a photo to record who arrived for this shift</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('attendance_index') }}" class="btn btn-ghost">Cancel</a>
+  </div>
+</div>
+
+<div class="two-col-layout" style="grid-template-columns:1fr 1fr;max-width:860px">
+
+  <!-- Left: Form -->
+  <form method="POST" action="{{ url_for('attendance_log') }}" id="attendanceForm">
+    <input type="hidden" name="photo_data" id="photoData" />
+
+    <div class="card mb-3">
+      <div class="card-header"><h3>Shift Details</h3></div>
+      <div class="card-body">
+        <div class="form-group mb-2">
+          <label for="worker_name">Worker Name(s) <span class="required">*</span></label>
+          <input type="text" id="worker_name" name="worker_name"
+                 placeholder="e.g. Raju, Shubham, Ali" autocomplete="off" required />
+          <span class="form-hint">One name or a short list of workers in this photo</span>
+        </div>
+        <div class="form-grid form-grid-2 mt-2">
+          <div class="form-group">
+            <label for="shift">Shift <span class="required">*</span></label>
+            <select id="shift" name="shift" required>
+              <option value="">— Select shift —</option>
+              {% for s in shifts %}
+              <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="shift_date">Date <span class="required">*</span></label>
+            <input type="date" id="shift_date" name="shift_date" value="{{ today }}" required />
+          </div>
+        </div>
+        <div class="form-group mt-2">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" name="notes" placeholder="Any remarks about this attendance..." style="min-height:60px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100" id="submitBtn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 12l5 5L20 7"/>
+      </svg> Save Attendance Record
+    </button>
+    <p class="form-hint text-center mt-1" id="submitHint">Capture or upload a photo first</p>
+  </form>
+
+  <!-- Right: Camera capture -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Photo</h3>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openCamera()" id="cameraBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg> Open Camera
+          </button>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg> Upload
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="loadFile(this)" />
+          </label>
+          <!-- Shown when camera is unavailable (HTTP / no permission) -->
+          <span id="cameraUnavailableNote" style="display:none;font-size:.75rem;color:var(--warning);align-self:center">
+            Camera requires HTTPS — use Upload
+          </span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        <!-- Preview area -->
+        <div id="previewArea" style="min-height:220px;display:flex;align-items:center;justify-content:center;background:var(--grey-50);border-bottom:1px solid var(--grey-100)">
+          <div id="previewPlaceholder" style="text-align:center;color:var(--text-muted);padding:32px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 10px;display:block;color:var(--grey-200)">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <p style="font-size:.85rem">No photo yet</p>
+          </div>
+          <img id="previewImg" src="" alt="Preview" style="display:none;max-width:100%;max-height:280px;object-fit:contain" />
+        </div>
+        <div id="retakeArea" style="display:none;padding:12px 16px;border-top:1px solid var(--grey-100)">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="retakePhoto()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+              <path d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/>
+            </svg> Retake Photo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Camera Modal ─────────────────────────────────────────────────────────── -->
+<div id="cameraModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:600;align-items:center;justify-content:center;flex-direction:column">
+  <div style="background:#111;border-radius:12px;overflow:hidden;width:min(480px,94vw);position:relative">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#000">
+      <span style="color:#fff;font-weight:600;font-size:.9rem">Camera</span>
+      <button onclick="closeCamera()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1;padding:0 4px">×</button>
+    </div>
+
+    <!-- Video preview -->
+    <div style="position:relative;background:#000">
+      <video id="cameraVideo" autoplay playsinline muted
+             style="width:100%;display:block;max-height:360px;object-fit:cover"></video>
+      <canvas id="cameraCanvas" style="display:none"></canvas>
+    </div>
+
+    <!-- Controls -->
+    <div style="padding:16px;background:#111;display:flex;gap:10px;justify-content:center">
+      <button id="captureBtn" onclick="capturePhoto()"
+              style="width:60px;height:60px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.15);cursor:pointer;transition:background .15s"
+              onmouseover="this.style.background='rgba(255,255,255,.3)'"
+              onmouseout="this.style.background='rgba(255,255,255,.15)'">
+        <svg viewBox="0 0 24 24" fill="white" stroke="none" style="width:28px;height:28px">
+          <circle cx="12" cy="12" r="8"/>
+        </svg>
+      </button>
+    </div>
+    <p style="text-align:center;color:rgba(255,255,255,.5);font-size:.8rem;padding-bottom:14px;margin:0">
+      Tap the button to capture
+    </p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+const photoDataInput = document.getElementById('photoData');
+const submitBtn      = document.getElementById('submitBtn');
+const submitHint     = document.getElementById('submitHint');
+const previewImg     = document.getElementById('previewImg');
+const previewPlaceholder = document.getElementById('previewPlaceholder');
+const retakeArea     = document.getElementById('retakeArea');
+
+// Detect camera support (requires HTTPS / secure context)
+const cameraSupported = !!(window.isSecureContext &&
+                            navigator.mediaDevices &&
+                            navigator.mediaDevices.getUserMedia);
+if (!cameraSupported) {
+  const btn = document.getElementById('cameraBtn');
+  if (btn) { btn.style.display = 'none'; }
+  const note = document.getElementById('cameraUnavailableNote');
+  if (note) { note.style.display = 'inline'; }
+}
+
+function setPhoto(dataUrl) {
+  photoDataInput.value = dataUrl;
+  previewImg.src = dataUrl;
+  previewImg.style.display = 'block';
+  previewPlaceholder.style.display = 'none';
+  retakeArea.style.display = 'block';
+  submitBtn.disabled = false;
+  submitHint.textContent = 'Photo ready — fill in the details above and save';
+}
+
+function retakePhoto() {
+  photoDataInput.value = '';
+  previewImg.src = '';
+  previewImg.style.display = 'none';
+  previewPlaceholder.style.display = 'flex';
+  retakeArea.style.display = 'none';
+  submitBtn.disabled = true;
+  submitHint.textContent = 'Capture or upload a photo first';
+}
+
+/* ── Camera ── */
+async function openCamera() {
+  if (!cameraSupported) {
+    document.getElementById('cameraUnavailableNote').style.display = 'inline';
+    return;
+  }
+  const modal = document.getElementById('cameraModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  const video = document.getElementById('cameraVideo');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    closeCamera();
+    // Show inline note rather than a disruptive alert
+    const note = document.getElementById('cameraUnavailableNote');
+    if (note) {
+      note.textContent = 'Camera access denied — please use Upload instead.';
+      note.style.display = 'inline';
+    }
+    const btn = document.getElementById('cameraBtn');
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('cameraCanvas');
+  // Resize to max 1024px wide while keeping aspect ratio
+  const maxW = 1024;
+  let w = video.videoWidth, h = video.videoHeight;
+  if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+  closeCamera();
+  setPhoto(dataUrl);
+}
+
+function closeCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const modal = document.getElementById('cameraModal');
+  modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+/* ── File upload ── */
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    // Compress via canvas before storing
+    const img = new Image();
+    img.onload = function() {
+      const maxW = 1024;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      setPhoto(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';  // allow re-selecting same file
+}
+
+/* Escape key closes camera */
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeCamera();
+});
+</script>
+{% endblock %}

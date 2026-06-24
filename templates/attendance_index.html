@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Attendance Photos{% endblock %}
+{% block topbar_title %}Attendance Photos{% endblock %}
+{% block topbar_meta %}Daily shift attendance records{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('attendance_log') }}" class="btn btn-primary btn-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg> Log Attendance
+  </a>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-text">
+    <h2>Attendance Photos</h2>
+    <p>{{ photos|length }} record{% if photos|length != 1 %}s{% endif %}{% if date_filter or shift_filter %} matching filters{% endif %}</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('attendance_log') }}" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg> Log Attendance
+    </a>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+  <div class="card-body" style="padding:16px 24px">
+    <form method="GET" action="{{ url_for('attendance_index') }}" class="attendance-filter-row">
+      <div class="form-group" style="flex:1;max-width:200px">
+        <label for="date">Date</label>
+        <input type="date" id="date" name="date" value="{{ date_filter }}" />
+      </div>
+      <div class="form-group" style="flex:1;max-width:180px">
+        <label for="shift">Shift</label>
+        <select id="shift" name="shift">
+          <option value="">All Shifts</option>
+          <option value="Morning" {% if shift_filter == 'Morning' %}selected{% endif %}>Morning</option>
+          <option value="Evening" {% if shift_filter == 'Evening' %}selected{% endif %}>Evening</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <button type="submit" class="btn btn-outline">Filter</button>
+        {% if date_filter or shift_filter %}
+        <a href="{{ url_for('attendance_index') }}" class="btn btn-ghost">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if photos %}
+<!-- Photo Grid -->
+<div class="photo-gallery-grid">
+  {% for photo in photos %}
+  <div class="photo-card">
+    <!-- Thumbnail — click to enlarge -->
+    <div class="photo-thumb-wrap" onclick="openLightbox('{{ url_for('serve_photo', folder='attendance', filename=photo.photo_filename) }}', '{{ photo.worker_name }} · {{ photo.shift }} · {{ photo.shift_date | fmt_date }}')">
+      <img src="{{ url_for('serve_photo', folder='attendance', filename=photo.photo_filename) }}"
+           alt="Attendance photo" class="photo-thumb" loading="lazy" />
+      <div class="photo-thumb-overlay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+        </svg>
+      </div>
+    </div>
+    <!-- Card info -->
+    <div class="photo-card-body">
+      <div class="photo-card-name">{{ photo.worker_name }}</div>
+      <div class="photo-card-meta">
+        <span class="shift-badge shift-{{ photo.shift | lower }}">{{ photo.shift }}</span>
+        <span style="color:var(--text-muted);font-size:.78rem">{{ photo.shift_date | fmt_date }}</span>
+      </div>
+      {% if photo.notes %}
+      <div class="photo-card-notes">{{ photo.notes }}</div>
+      {% endif %}
+      <div class="photo-card-footer">
+        <span style="font-size:.72rem;color:var(--text-muted)">
+          by {{ photo.taken_by }} · {{ photo.created_at | ist }}
+        </span>
+        {% if current_user.role == 'admin' %}
+        <form method="POST" action="{{ url_for('attendance_delete', photo_id=photo.id) }}"
+              onsubmit="return confirm('Delete this attendance record?')" style="margin:0">
+          <button type="submit" class="btn btn-danger btn-sm" style="padding:3px 10px;font-size:.75rem">Delete</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    <h3>No attendance photos yet</h3>
+    <p>{% if date_filter or shift_filter %}No records match the selected filters.{% else %}Start logging attendance when workers arrive for their shift.{% endif %}</p>
+    <a href="{{ url_for('attendance_log') }}" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg> Log First Attendance
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Lightbox modal -->
+<div id="lightboxModal" class="lightbox-backdrop" onclick="closeLightbox()" style="display:none">
+  <div class="lightbox-inner" onclick="event.stopPropagation()">
+    <button class="lightbox-close" onclick="closeLightbox()">×</button>
+    <img id="lightboxImg" src="" alt="" class="lightbox-img" />
+    <div id="lightboxCaption" class="lightbox-caption"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openLightbox(src, caption) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxCaption').textContent = caption;
+  const modal = document.getElementById('lightboxModal');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightboxModal').style.display = 'none';
+  document.getElementById('lightboxImg').src = '';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+</script>
+{% endblock %}
